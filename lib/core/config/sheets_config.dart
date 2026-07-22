@@ -3,7 +3,7 @@ class SheetsConfig {
 
   // ── Google Apps Script Web App URL ────────────────────────────────────────
   static const String appsScriptUrl =
-      'String.fromEnvironment('APPS_SCRIPT_URL')';
+      String.fromEnvironment('APPS_SCRIPT_URL');
 
   // ── Google Spreadsheet ID ─────────────────────────────────────────────────
   // From the URL: https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/edit
