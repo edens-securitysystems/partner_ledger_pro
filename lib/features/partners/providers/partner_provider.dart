@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/enums/database_enums.dart';
 import '../../../core/models/dto/partner_dto.dart';
 import '../../../core/models/entities/partner.dart';
-import '../../../core/providers/service_providers.dart';
+import '../../../core/providers/repository_providers.dart';
 import '../../../core/repositories/partner_repository.dart';
 
 // ── State ────────────────────────────────────────────────────────────────────

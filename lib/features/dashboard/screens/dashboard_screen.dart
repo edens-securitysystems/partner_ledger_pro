@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 
@@ -108,10 +109,10 @@ class _DashboardContent extends ConsumerWidget {
                   24,
                 ),
                 child: QuickActions(
-                  onAddTransaction: () {},
-                  onAddPartner: () {},
-                  onViewReports: () {},
-                  onExport: () {},
+                  onAddTransaction: () => context.push('/transactions/add'),
+                  onAddPartner: () => context.push('/partners/add'),
+                  onViewReports: () => context.push('/reports'),
+                  onExport: () => context.push('/settings/backup'),
                 ),
               ),
             ),

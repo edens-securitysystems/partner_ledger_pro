@@ -2,7 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/entities/notification.dart';
-import '../../../core/providers/service_providers.dart';
+import '../../../core/providers/repository_providers.dart';
 import '../../../core/repositories/notification_repository.dart';
 
 // ── State ────────────────────────────────────────────────────────────────────

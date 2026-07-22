@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/dto/transaction_dto.dart';
 import '../../../core/models/entities/transaction.dart';
-import '../../../core/providers/service_providers.dart';
+import '../../../core/providers/repository_providers.dart';
 import '../../../core/repositories/transaction_repository.dart';
 
 // ── State ────────────────────────────────────────────────────────────────────

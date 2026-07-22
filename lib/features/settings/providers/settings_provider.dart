@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/enums.dart';
+import '../../../core/providers/service_providers.dart';
+import '../../../core/services/storage_service.dart';
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -72,35 +74,37 @@ class SettingsState extends Equatable {
 // ── Notifier ─────────────────────────────────────────────────────────────────
 
 class SettingsNotifier extends StateNotifier<SettingsState> {
-  SettingsNotifier() : super(const SettingsState.initial());
+  final StorageService _storage;
+
+  SettingsNotifier(this._storage) : super(const SettingsState.initial());
 
   void updateTheme(ThemeMode mode) {
     state = state.copyWith(themeMode: mode);
-    // _persistSetting('theme_mode', mode.name);
+    _storage.setThemePreference(mode.name);
   }
 
   void updateCurrency(Currency currency) {
     state = state.copyWith(currency: currency);
-    // _persistSetting('currency', currency.code);
+    _storage.setCurrency(currency.code);
   }
 
   void updateLanguage(String language) {
     state = state.copyWith(language: language);
-    // _persistSetting('language', language);
+    _storage.setLanguage(language);
   }
 
   void updateNotifications(bool enabled) {
     state = state.copyWith(notificationsEnabled: enabled);
-    // _persistSetting('notifications_enabled', enabled.toString());
   }
 
   Future<void> backupData() async {
     state = state.copyWith(isBackingUp: true, error: null);
     try {
-      // final date = await _settingsService.backupData();
-      // state = state.copyWith(isBackingUp: false, lastBackupDate: date);
-      await Future.delayed(const Duration(milliseconds: 500));
-      state = state.copyWith(isBackingUp: false, lastBackupDate: DateTime.now().toIso8601String());
+      await _storage.setLastSync(DateTime.now());
+      state = state.copyWith(
+        isBackingUp: false,
+        lastBackupDate: DateTime.now().toIso8601String(),
+      );
     } catch (e) {
       state = state.copyWith(isBackingUp: false, error: e.toString());
     }
@@ -109,8 +113,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   Future<void> restoreData() async {
     state = state.copyWith(isRestoring: true, error: null);
     try {
-      // await _settingsService.restoreData();
-      await Future.delayed(const Duration(milliseconds: 500));
+      await loadSettings();
       state = state.copyWith(isRestoring: false);
     } catch (e) {
       state = state.copyWith(isRestoring: false, error: e.toString());
@@ -120,11 +123,35 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   Future<void> loadSettings() async {
     state = state.copyWith(isLoading: true);
     try {
-      // final theme = await _settingsService.getSetting('theme_mode');
-      // final currency = await _settingsService.getSetting('currency');
-      // ...
-      await Future.delayed(const Duration(milliseconds: 200));
-      state = state.copyWith(isLoading: false);
+      final themeName = await _storage.getThemePreference();
+      final currencyCode = await _storage.getCurrency();
+      final language = await _storage.getLanguage();
+      final lastSync = await _storage.getLastSync();
+
+      ThemeMode themeMode = ThemeMode.system;
+      if (themeName != null) {
+        themeMode = ThemeMode.values.firstWhere(
+          (t) => t.name == themeName,
+          orElse: () => ThemeMode.system,
+        );
+      }
+
+      Currency currency = Currency.inr;
+      try {
+        currency = Currency.values.firstWhere(
+          (c) => c.name.toUpperCase() == currencyCode.toUpperCase(),
+        );
+      } catch (_) {
+        currency = Currency.inr;
+      }
+
+      state = state.copyWith(
+        isLoading: false,
+        themeMode: themeMode,
+        currency: currency,
+        language: language,
+        lastBackupDate: lastSync?.toIso8601String(),
+      );
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -139,7 +166,8 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
 
 final settingsProvider =
     StateNotifierProvider<SettingsNotifier, SettingsState>((ref) {
-  return SettingsNotifier();
+  final storage = ref.watch(storageServiceProvider);
+  return SettingsNotifier(storage);
 });
 
 final themeModeProvider = Provider<ThemeMode>((ref) {

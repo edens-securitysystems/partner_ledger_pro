@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/providers/service_providers.dart';
 import '../../../theme/app_colors.dart';
 
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
@@ -58,19 +59,22 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     try {
-      await Future.delayed(const Duration(milliseconds: 1500));
+      final authService = ref.read(authServiceProvider);
+      await authService.forgotPassword(_emailController.text.trim());
       if (mounted) {
         setState(() {
           _isLoading = false;
           _isSuccess = true;
         });
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to send reset link. Please try again.'),
+          SnackBar(
+            content: Text(e.toString().contains('network')
+                ? 'Network error. Please check your connection.'
+                : 'Failed to send reset link. Please try again.'),
             backgroundColor: AppColors.lightError,
             behavior: SnackBarBehavior.floating,
           ),

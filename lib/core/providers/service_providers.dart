@@ -1,10 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../repositories/dashboard_repository.dart';
-import '../repositories/partner_repository.dart';
 import '../repositories/partner_approval_repository.dart';
-import '../repositories/transaction_repository.dart';
-import '../repositories/notification_repository.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_auth_service.dart';
 import '../services/google_sheets_service.dart';
@@ -49,31 +45,7 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
   return NotificationService();
 });
 
-// ── Repositories ─────────────────────────────────────────────────
-
-final partnerRepositoryProvider = Provider<PartnerRepository>((ref) {
-  final sheets = ref.watch(googleSheetsServiceProvider);
-  final storage = ref.watch(storageServiceProvider);
-  return PartnerRepository(sheets: sheets, storage: storage);
-});
-
-final transactionRepositoryProvider = Provider<TransactionRepository>((ref) {
-  final sheets = ref.watch(googleSheetsServiceProvider);
-  final storage = ref.watch(storageServiceProvider);
-  return TransactionRepository(sheets: sheets, storage: storage);
-});
-
-final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) {
-  final sheets = ref.watch(googleSheetsServiceProvider);
-  final storage = ref.watch(storageServiceProvider);
-  return DashboardRepository(sheets: sheets, storage: storage);
-});
-
-final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
-  final sheets = ref.watch(googleSheetsServiceProvider);
-  final storage = ref.watch(storageServiceProvider);
-  return NotificationRepository(sheets: sheets, storage: storage);
-});
+// ── Partner Approval Repository ──────────────────────────────────
 
 final partnerApprovalRepositoryProvider = Provider<PartnerApprovalRepository>((ref) {
   final sheets = ref.watch(googleSheetsServiceProvider);

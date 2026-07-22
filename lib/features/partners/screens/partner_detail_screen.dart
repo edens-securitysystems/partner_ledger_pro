@@ -5,11 +5,14 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/database/enums/database_enums.dart';
+import '../../../core/models/entities/ledger_entry.dart';
 import '../../../core/models/entities/partner.dart';
+import '../../../core/providers/repository_providers.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/common/app_bar_widget.dart';
 import '../../../widgets/common/confirmation_dialog.dart';
 import '../../../widgets/common/summary_card.dart';
+import '../../transactions/providers/transaction_provider.dart';
 import '../providers/partner_provider.dart';
 import '../widgets/partner_stats_widget.dart';
 
@@ -462,16 +465,17 @@ class _OverviewTab extends StatelessWidget {
   }
 }
 
-class _LedgerTab extends StatelessWidget {
+class _LedgerTab extends ConsumerWidget {
   final Partner partner;
 
   const _LedgerTab({required this.partner});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final currencyFormat = NumberFormat('#,##0.00');
+    final ledgerAsync = ref.watch(_partnerLedgerFutureProvider(partner.id));
 
     return Column(
       children: [
@@ -520,11 +524,30 @@ class _LedgerTab extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          '\u20B9${currencyFormat.format(partner.capital * 1.15)}',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: colorScheme.primary,
+                        ledgerAsync.when(
+                          data: (entries) {
+                            final closingBalance = entries.isNotEmpty
+                                ? entries.first.balance
+                                : partner.capital;
+                            return Text(
+                              '\u20B9${currencyFormat.format(closingBalance)}',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.primary,
+                              ),
+                            );
+                          },
+                          loading: () => const SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          error: (_, __) => Text(
+                            '\u20B9${currencyFormat.format(partner.capital)}',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: colorScheme.primary,
+                            ),
                           ),
                         ),
                       ],
@@ -536,180 +559,223 @@ class _LedgerTab extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: ListView(
-            padding: const EdgeInsets.only(bottom: 16),
-            children: [
-              _ledgerEntryRow(
-                theme,
-                colorScheme,
-                date: partner.joiningDate,
-                description: 'Initial Capital Investment',
-                amount: partner.capital,
-                isCredit: true,
-                balance: partner.capital,
-                currencyFormat: currencyFormat,
-              ),
-              _ledgerEntryRow(
-                theme,
-                colorScheme,
-                date: partner.joiningDate.add(const Duration(days: 30)),
-                description: 'Monthly Profit Share',
-                amount: partner.capital * 0.08,
-                isCredit: true,
-                balance: partner.capital * 1.08,
-                currencyFormat: currencyFormat,
-              ),
-              _ledgerEntryRow(
-                theme,
-                colorScheme,
-                date: partner.joiningDate.add(const Duration(days: 45)),
-                description: 'Office Expense Contribution',
-                amount: partner.capital * 0.03,
-                isCredit: false,
-                balance: partner.capital * 1.05,
-                currencyFormat: currencyFormat,
-              ),
-              _ledgerEntryRow(
-                theme,
-                colorScheme,
-                date: partner.joiningDate.add(const Duration(days: 60)),
-                description: 'Quarterly Bonus',
-                amount: partner.capital * 0.10,
-                isCredit: true,
-                balance: partner.capital * 1.15,
-                currencyFormat: currencyFormat,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _ledgerEntryRow(
-    ThemeData theme,
-    ColorScheme colorScheme, {
-    required DateTime date,
-    required String description,
-    required double amount,
-    required bool isCredit,
-    required double balance,
-    required NumberFormat currencyFormat,
-  }) {
-    final amountColor = isCredit ? AppColors.profit : AppColors.loss;
-    final dateFormat = DateFormat('dd MMM');
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              width: 4,
-              height: 48,
-              decoration: BoxDecoration(
-                color: amountColor,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    description,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
+          child: ledgerAsync.when(
+            data: (entries) {
+              if (entries.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
+                      Icon(Icons.book_rounded,
+                          size: 48, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
+                      const SizedBox(height: 12),
                       Text(
-                        dateFormat.format(date),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        'Balance: \u20B9${currencyFormat.format(balance)}',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
+                        'No ledger entries yet',
+                        style: theme.textTheme.bodyMedium?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
+                );
+              }
+              return ListView.builder(
+                padding: const EdgeInsets.only(bottom: 16),
+                itemCount: entries.length,
+                itemBuilder: (context, index) {
+                  final entry = entries[index];
+                  final amountColor = entry.isCredit ? AppColors.profit : AppColors.loss;
+                  final dateFormat = DateFormat('dd MMM');
+
+                  return Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 4,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: amountColor,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  entry.description ?? entry.typeDisplay,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    Text(
+                                      dateFormat.format(entry.date),
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Text(
+                                      'Balance: \u20B9${currencyFormat.format(entry.balance)}',
+                                      style: theme.textTheme.labelSmall?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            '${entry.isCredit ? '+' : '-'}\u20B9${currencyFormat.format(entry.amount)}',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: amountColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(
+              child: Text('Error loading ledger: $e'),
             ),
-            const SizedBox(width: 12),
-            Text(
-              '${isCredit ? '+' : '-'}\u20B9${currencyFormat.format(amount)}',
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: amountColor,
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
 
-class _TransactionsTab extends StatelessWidget {
+final _partnerLedgerFutureProvider =
+    FutureProvider.family<List<LedgerEntry>, String>((ref, partnerId) async {
+  final repository = ref.watch(ledgerRepositoryProvider);
+  final response = await repository.getPartnerLedger(partnerId);
+  if (response.success && response.data != null) {
+    return response.data!;
+  }
+  return [];
+});
+
+class _TransactionsTab extends ConsumerWidget {
   final Partner partner;
 
   const _TransactionsTab({required this.partner});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final transactions = ref.watch(transactionListProvider);
+    final partnerTransactions = transactions
+        .where((t) => t.partnerId == partner.id)
+        .toList();
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
+    if (partnerTransactions.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(40),
+                ),
+                child: Icon(
+                  Icons.receipt_long_rounded,
+                  size: 40,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Transaction History',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'No transactions found for ${partner.name}.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final currencyFormat = NumberFormat('#,##0.00');
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: partnerTransactions.length,
+      itemBuilder: (context, index) {
+        final t = partnerTransactions[index];
+        final isIncome = t.isIncome;
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            leading: Container(
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(40),
+                color: (isIncome ? AppColors.profit : AppColors.loss).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
-                Icons.receipt_long_rounded,
-                size: 40,
-                color: colorScheme.primary,
+                isIncome ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                size: 20,
+                color: isIncome ? AppColors.profit : AppColors.loss,
               ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Transaction History',
-              style: theme.textTheme.titleMedium?.copyWith(
+            title: Text(
+              t.description ?? t.typeDisplay,
+              style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Transactions for ${partner.name} will appear here.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
+            subtitle: Text(
+              '${DateFormat('dd MMM yyyy').format(t.date)}  ${t.category ?? ''}',
+              style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
             ),
-          ],
-        ),
-      ),
+            trailing: Text(
+              '${isIncome ? '+' : '-'}\u20B9${currencyFormat.format(t.amount)}',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: isIncome ? AppColors.profit : AppColors.loss,
+              ),
+            ),
+            onTap: () => context.push('/transactions/${t.id}'),
+          ),
+        );
+      },
     );
   }
 }

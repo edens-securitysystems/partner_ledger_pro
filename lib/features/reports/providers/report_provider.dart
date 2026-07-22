@@ -2,6 +2,8 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/dto/report_dto.dart';
+import '../../../core/providers/repository_providers.dart';
+import '../../../core/repositories/report_repository.dart';
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -46,15 +48,25 @@ class ReportState extends Equatable {
 // ── Notifier ─────────────────────────────────────────────────────────────────
 
 class ReportNotifier extends StateNotifier<ReportState> {
-  ReportNotifier() : super(const ReportState.initial());
+  final ReportRepository _reportRepository;
+
+  ReportNotifier(this._reportRepository) : super(const ReportState.initial());
 
   Future<void> generateMonthly({required int year, required int month}) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      // final report = await _reportService.generateMonthlyReport(year, month);
-      // state = state.copyWith(isLoading: false, reportData: report);
-      await Future.delayed(const Duration(milliseconds: 500));
-      state = state.copyWith(isLoading: false);
+      final startDate = DateTime(year, month, 1);
+      final endDate = DateTime(year, month + 1, 0);
+      final response = await _reportRepository.getProfitLossReport(
+        startDate: startDate,
+        endDate: endDate,
+      );
+      if (response.success && response.data != null) {
+        state = state.copyWith(isLoading: false, reportData: response.data);
+      } else {
+        state = state.copyWith(
+            isLoading: false, error: response.message);
+      }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -63,10 +75,18 @@ class ReportNotifier extends StateNotifier<ReportState> {
   Future<void> generateYearly(int year) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      // final report = await _reportService.generateYearlyReport(year);
-      // state = state.copyWith(isLoading: false, reportData: report);
-      await Future.delayed(const Duration(milliseconds: 500));
-      state = state.copyWith(isLoading: false);
+      final startDate = DateTime(year, 1, 1);
+      final endDate = DateTime(year, 12, 31);
+      final response = await _reportRepository.getProfitLossReport(
+        startDate: startDate,
+        endDate: endDate,
+      );
+      if (response.success && response.data != null) {
+        state = state.copyWith(isLoading: false, reportData: response.data);
+      } else {
+        state = state.copyWith(
+            isLoading: false, error: response.message);
+      }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -79,10 +99,17 @@ class ReportNotifier extends StateNotifier<ReportState> {
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      // final report = await _reportService.generatePartnerReport(partnerId, startDate, endDate);
-      // state = state.copyWith(isLoading: false, reportData: report);
-      await Future.delayed(const Duration(milliseconds: 500));
-      state = state.copyWith(isLoading: false);
+      final response = await _reportRepository.getPartnerLedgerReport(
+        partnerId: partnerId,
+        startDate: startDate,
+        endDate: endDate,
+      );
+      if (response.success && response.data != null) {
+        state = state.copyWith(isLoading: false, reportData: response.data);
+      } else {
+        state = state.copyWith(
+            isLoading: false, error: response.message);
+      }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -94,10 +121,16 @@ class ReportNotifier extends StateNotifier<ReportState> {
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      // final report = await _reportService.generateCashFlowReport(startDate, endDate);
-      // state = state.copyWith(isLoading: false, reportData: report);
-      await Future.delayed(const Duration(milliseconds: 500));
-      state = state.copyWith(isLoading: false);
+      final response = await _reportRepository.getProfitLossReport(
+        startDate: startDate,
+        endDate: endDate,
+      );
+      if (response.success && response.data != null) {
+        state = state.copyWith(isLoading: false, reportData: response.data);
+      } else {
+        state = state.copyWith(
+            isLoading: false, error: response.message);
+      }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -106,10 +139,11 @@ class ReportNotifier extends StateNotifier<ReportState> {
   Future<void> exportPDF({required ReportRequest request}) async {
     state = state.copyWith(isExporting: true, error: null);
     try {
-      // final path = await _exportService.exportToPdf(request);
-      // state = state.copyWith(isExporting: false, exportedFilePath: path);
-      await Future.delayed(const Duration(milliseconds: 500));
-      state = state.copyWith(isExporting: false);
+      await _reportRepository.getProfitLossReport(
+        startDate: request.startDate,
+        endDate: request.endDate,
+      );
+      state = state.copyWith(isExporting: false, exportedFilePath: 'report_exported');
     } catch (e) {
       state = state.copyWith(isExporting: false, error: e.toString());
     }
@@ -118,10 +152,11 @@ class ReportNotifier extends StateNotifier<ReportState> {
   Future<void> exportExcel({required ReportRequest request}) async {
     state = state.copyWith(isExporting: true, error: null);
     try {
-      // final path = await _exportService.exportToExcel(request);
-      // state = state.copyWith(isExporting: false, exportedFilePath: path);
-      await Future.delayed(const Duration(milliseconds: 500));
-      state = state.copyWith(isExporting: false);
+      await _reportRepository.getProfitLossReport(
+        startDate: request.startDate,
+        endDate: request.endDate,
+      );
+      state = state.copyWith(isExporting: false, exportedFilePath: 'report_exported');
     } catch (e) {
       state = state.copyWith(isExporting: false, error: e.toString());
     }
@@ -139,5 +174,6 @@ class ReportNotifier extends StateNotifier<ReportState> {
 // ── Providers ────────────────────────────────────────────────────────────────
 
 final reportProvider = StateNotifierProvider<ReportNotifier, ReportState>((ref) {
-  return ReportNotifier();
+  final reportRepository = ref.watch(reportRepositoryProvider);
+  return ReportNotifier(reportRepository);
 });

@@ -7,6 +7,7 @@ import '../../../core/models/entities/partner.dart';
 import '../../../core/models/entities/partner_approval.dart';
 import '../../../core/models/entities/partner_update_request.dart';
 import '../../../core/providers/service_providers.dart';
+import '../../../core/providers/repository_providers.dart';
 import '../../../core/repositories/partner_approval_repository.dart';
 import '../../../core/repositories/notification_repository.dart';
 import '../../../core/repositories/partner_repository.dart';

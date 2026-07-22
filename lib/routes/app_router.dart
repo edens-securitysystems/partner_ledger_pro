@@ -31,6 +31,7 @@ import '../features/settings/screens/backup_screen.dart';
 import '../features/notifications/screens/notifications_screen.dart';
 import '../features/businesses/screens/businesses_screen.dart';
 import '../features/businesses/screens/add_edit_business_screen.dart';
+import '../features/search/screens/search_screen.dart';
 import 'main_scaffold.dart';
 
 class RouteNames {
@@ -315,10 +316,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/search',
             name: RouteNames.search,
-            builder: (context, state) => const _PlaceholderScreen(
-              icon: Icons.search_rounded,
-              title: 'Search',
-            ),
+            builder: (context, state) => const SearchScreen(),
           ),
 
           GoRoute(
@@ -413,50 +411,6 @@ class NotFoundScreen extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PlaceholderScreen extends StatelessWidget {
-  final IconData icon;
-  final String title;
-
-  const _PlaceholderScreen({required this.icon, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: colorScheme.primary.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, size: 40, color: colorScheme.primary),
-            ),
-            const SizedBox(height: 20),
-            Text(title, style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            )),
-            const SizedBox(height: 8),
-            Text(
-              'Coming soon',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
         ),
       ),
     );
