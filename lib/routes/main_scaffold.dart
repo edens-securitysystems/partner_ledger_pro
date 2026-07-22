@@ -49,6 +49,17 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
   }
 
   int _currentIndex(String location) {
+    final user = ref.read(currentUserProvider);
+    final isPartner = user?.isPartner ?? false;
+
+    if (isPartner) {
+      if (location.startsWith('/partner-dashboard') || location == '/') return 0;
+      if (location.startsWith('/partner-ledger')) return 1;
+      if (location.startsWith('/partner-profit')) return 2;
+      if (location.startsWith('/scan-qr') || location.startsWith('/invite')) return 3;
+      return 4;
+    }
+
     if (location.startsWith('/dashboard') || location == '/') return 0;
     if (location.startsWith('/partner')) return 1;
     if (location.startsWith('/transaction')) return 2;
@@ -57,6 +68,30 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
   }
 
   void _onNavTap(int index, String location) {
+    final user = ref.read(currentUserProvider);
+    final isPartner = user?.isPartner ?? false;
+
+    if (isPartner) {
+      switch (index) {
+        case 0:
+          context.go('/partner-dashboard');
+          break;
+        case 1:
+          context.go('/partner-ledger-view');
+          break;
+        case 2:
+          context.go('/partner-profit-share');
+          break;
+        case 3:
+          context.go('/scan-qr');
+          break;
+        case 4:
+          context.go('/settings');
+          break;
+      }
+      return;
+    }
+
     switch (index) {
       case 0:
         context.go('/dashboard');
@@ -169,6 +204,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final user = ref.watch(currentUserProvider);
+    final isPartner = user?.isPartner ?? false;
 
     return Scaffold(
       body: Row(
@@ -203,80 +239,130 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: Column(
-                        children: [
-                          _SidebarNavItem(
-                            icon: Icons.dashboard_rounded,
-                            label: 'Dashboard',
-                            isSelected: location.startsWith('/dashboard'),
-                            isExpanded: _isSidebarExpanded,
-                            onTap: () => context.go('/dashboard'),
-                          ),
-                          const SizedBox(height: 2),
-                          _SidebarNavItem(
-                            icon: Icons.people_rounded,
-                            label: 'Partners',
-                            isSelected: location.startsWith('/partner'),
-                            isExpanded: _isSidebarExpanded,
-                            onTap: () => context.go('/partners'),
-                          ),
-                          const SizedBox(height: 2),
-                          _SidebarNavItem(
-                            icon: Icons.receipt_long_rounded,
-                            label: 'Transactions',
-                            isSelected: location.startsWith('/transaction'),
-                            isExpanded: _isSidebarExpanded,
-                            onTap: () => context.go('/transactions'),
-                          ),
-                          const SizedBox(height: 2),
-                          _SidebarNavItem(
-                            icon: Icons.assessment_rounded,
-                            label: 'Reports',
-                            isSelected: location.startsWith('/report'),
-                            isExpanded: _isSidebarExpanded,
-                            onTap: () => context.go('/reports'),
-                          ),
-                          const SizedBox(height: 2),
-                          _SidebarNavItem(
-                            icon: Icons.business_rounded,
-                            label: 'Businesses',
-                            isSelected: location.startsWith('/business'),
-                            isExpanded: _isSidebarExpanded,
-                            onTap: () => context.go('/businesses'),
-                          ),
-                          const SizedBox(height: 2),
-                          _SidebarNavItem(
-                            icon: Icons.settings_rounded,
-                            label: 'Settings',
-                            isSelected: location.startsWith('/settings'),
-                            isExpanded: _isSidebarExpanded,
-                            onTap: () => context.go('/settings'),
-                          ),
-                          const SizedBox(height: 2),
-                          _SidebarNavItem(
-                            icon: Icons.notifications_rounded,
-                            label: 'Notifications',
-                            isSelected: location.startsWith('/notification'),
-                            isExpanded: _isSidebarExpanded,
-                            badgeCount: 3,
-                            onTap: () => context.go('/notifications'),
-                          ),
-                          const SizedBox(height: 2),
-                          _SidebarNavItem(
-                            icon: Icons.how_to_vote_outlined,
-                            label: 'Approvals',
-                            isSelected: location.startsWith('/pending-approval'),
-                            isExpanded: _isSidebarExpanded,
-                            onTap: () => context.go('/pending-approvals'),
-                          ),
-                          const SizedBox(height: 2),
-                          _SidebarNavItem(
-                            icon: Icons.search_rounded,
-                            label: 'Search',
-                            isSelected: location.startsWith('/search'),
-                            isExpanded: _isSidebarExpanded,
-                            onTap: () => context.go('/search'),
-                          ),
-                        ],
+                        children: isPartner
+                            ? [
+                                _SidebarNavItem(
+                                  icon: Icons.dashboard_rounded,
+                                  label: 'My Dashboard',
+                                  isSelected: location.startsWith('/partner-dashboard'),
+                                  isExpanded: _isSidebarExpanded,
+                                  onTap: () => context.go('/partner-dashboard'),
+                                ),
+                                const SizedBox(height: 2),
+                                _SidebarNavItem(
+                                  icon: Icons.receipt_long_rounded,
+                                  label: 'My Ledger',
+                                  isSelected: location.startsWith('/partner-ledger'),
+                                  isExpanded: _isSidebarExpanded,
+                                  onTap: () => context.go('/partner-ledger-view'),
+                                ),
+                                const SizedBox(height: 2),
+                                _SidebarNavItem(
+                                  icon: Icons.trending_up_rounded,
+                                  label: 'Profit Share',
+                                  isSelected: location.startsWith('/partner-profit'),
+                                  isExpanded: _isSidebarExpanded,
+                                  onTap: () => context.go('/partner-profit-share'),
+                                ),
+                                const SizedBox(height: 2),
+                                _SidebarNavItem(
+                                  icon: Icons.qr_code_scanner_rounded,
+                                  label: 'Scan QR',
+                                  isSelected: location.startsWith('/scan-qr'),
+                                  isExpanded: _isSidebarExpanded,
+                                  onTap: () => context.go('/scan-qr'),
+                                ),
+                                const SizedBox(height: 2),
+                                _SidebarNavItem(
+                                  icon: Icons.settings_rounded,
+                                  label: 'Settings',
+                                  isSelected: location.startsWith('/settings'),
+                                  isExpanded: _isSidebarExpanded,
+                                  onTap: () => context.go('/settings'),
+                                ),
+                                const SizedBox(height: 2),
+                                _SidebarNavItem(
+                                  icon: Icons.notifications_rounded,
+                                  label: 'Notifications',
+                                  isSelected: location.startsWith('/notification'),
+                                  isExpanded: _isSidebarExpanded,
+                                  onTap: () => context.go('/notifications'),
+                                ),
+                              ]
+                            : [
+                                _SidebarNavItem(
+                                  icon: Icons.dashboard_rounded,
+                                  label: 'Dashboard',
+                                  isSelected: location.startsWith('/dashboard'),
+                                  isExpanded: _isSidebarExpanded,
+                                  onTap: () => context.go('/dashboard'),
+                                ),
+                                const SizedBox(height: 2),
+                                _SidebarNavItem(
+                                  icon: Icons.people_rounded,
+                                  label: 'Partners',
+                                  isSelected: location.startsWith('/partner'),
+                                  isExpanded: _isSidebarExpanded,
+                                  onTap: () => context.go('/partners'),
+                                ),
+                                const SizedBox(height: 2),
+                                _SidebarNavItem(
+                                  icon: Icons.receipt_long_rounded,
+                                  label: 'Transactions',
+                                  isSelected: location.startsWith('/transaction'),
+                                  isExpanded: _isSidebarExpanded,
+                                  onTap: () => context.go('/transactions'),
+                                ),
+                                const SizedBox(height: 2),
+                                _SidebarNavItem(
+                                  icon: Icons.assessment_rounded,
+                                  label: 'Reports',
+                                  isSelected: location.startsWith('/report'),
+                                  isExpanded: _isSidebarExpanded,
+                                  onTap: () => context.go('/reports'),
+                                ),
+                                const SizedBox(height: 2),
+                                _SidebarNavItem(
+                                  icon: Icons.business_rounded,
+                                  label: 'Businesses',
+                                  isSelected: location.startsWith('/business'),
+                                  isExpanded: _isSidebarExpanded,
+                                  onTap: () => context.go('/businesses'),
+                                ),
+                                const SizedBox(height: 2),
+                                _SidebarNavItem(
+                                  icon: Icons.settings_rounded,
+                                  label: 'Settings',
+                                  isSelected: location.startsWith('/settings'),
+                                  isExpanded: _isSidebarExpanded,
+                                  onTap: () => context.go('/settings'),
+                                ),
+                                const SizedBox(height: 2),
+                                _SidebarNavItem(
+                                  icon: Icons.notifications_rounded,
+                                  label: 'Notifications',
+                                  isSelected: location.startsWith('/notification'),
+                                  isExpanded: _isSidebarExpanded,
+                                  badgeCount: 3,
+                                  onTap: () => context.go('/notifications'),
+                                ),
+                                const SizedBox(height: 2),
+                                _SidebarNavItem(
+                                  icon: Icons.how_to_vote_outlined,
+                                  label: 'Approvals',
+                                  isSelected: location.startsWith('/pending-approval'),
+                                  isExpanded: _isSidebarExpanded,
+                                  onTap: () => context.go('/pending-approvals'),
+                                ),
+                                const SizedBox(height: 2),
+                                _SidebarNavItem(
+                                  icon: Icons.search_rounded,
+                                  label: 'Search',
+                                  isSelected: location.startsWith('/search'),
+                                  isExpanded: _isSidebarExpanded,
+                                  onTap: () => context.go('/search'),
+                                ),
+                              ],
                       ),
                     ),
                   ),
@@ -297,16 +383,20 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showQuickActions,
-        child: const Icon(Icons.add_rounded),
-      ),
+      floatingActionButton: isPartner
+          ? null
+          : FloatingActionButton(
+              onPressed: _showQuickActions,
+              child: const Icon(Icons.add_rounded),
+            ),
     );
   }
 
   Widget _buildMobileLayout(String location) {
     final index = _currentIndex(location);
     final bottomPadding = MediaQuery.of(context).viewPadding.bottom;
+    final user = ref.read(currentUserProvider);
+    final isPartner = user?.isPartner ?? false;
 
     return Scaffold(
       body: widget.child,
@@ -323,39 +413,69 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
           selectedIndex: index,
           onDestinationSelected: (i) => _onNavTap(i, location),
           height: 72 + bottomPadding,
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.dashboard_outlined),
-              selectedIcon: Icon(Icons.dashboard_rounded),
-              label: 'Dashboard',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.people_outlined),
-              selectedIcon: Icon(Icons.people_rounded),
-              label: 'Partners',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.receipt_long_outlined),
-              selectedIcon: Icon(Icons.receipt_long_rounded),
-              label: 'Transactions',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.assessment_outlined),
-              selectedIcon: Icon(Icons.assessment_rounded),
-              label: 'Reports',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.more_horiz_rounded),
-              selectedIcon: Icon(Icons.more_horiz_rounded),
-              label: 'More',
-            ),
-          ],
+          destinations: isPartner
+              ? const [
+                  NavigationDestination(
+                    icon: Icon(Icons.dashboard_outlined),
+                    selectedIcon: Icon(Icons.dashboard_rounded),
+                    label: 'Dashboard',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.receipt_long_outlined),
+                    selectedIcon: Icon(Icons.receipt_long_rounded),
+                    label: 'Ledger',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.trending_up_outlined),
+                    selectedIcon: Icon(Icons.trending_up_rounded),
+                    label: 'Profit',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.qr_code_scanner_outlined),
+                    selectedIcon: Icon(Icons.qr_code_scanner_rounded),
+                    label: 'Scan QR',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.more_horiz_rounded),
+                    selectedIcon: Icon(Icons.more_horiz_rounded),
+                    label: 'More',
+                  ),
+                ]
+              : const [
+                  NavigationDestination(
+                    icon: Icon(Icons.dashboard_outlined),
+                    selectedIcon: Icon(Icons.dashboard_rounded),
+                    label: 'Dashboard',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.people_outlined),
+                    selectedIcon: Icon(Icons.people_rounded),
+                    label: 'Partners',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.receipt_long_outlined),
+                    selectedIcon: Icon(Icons.receipt_long_rounded),
+                    label: 'Transactions',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.assessment_outlined),
+                    selectedIcon: Icon(Icons.assessment_rounded),
+                    label: 'Reports',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.more_horiz_rounded),
+                    selectedIcon: Icon(Icons.more_horiz_rounded),
+                    label: 'More',
+                  ),
+                ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showQuickActions,
-        child: const Icon(Icons.add_rounded),
-      ),
+      floatingActionButton: isPartner
+          ? null
+          : FloatingActionButton(
+              onPressed: _showQuickActions,
+              child: const Icon(Icons.add_rounded),
+            ),
     );
   }
 

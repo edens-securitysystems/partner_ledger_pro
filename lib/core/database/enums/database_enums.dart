@@ -3,7 +3,8 @@ enum UserRole {
   admin(1),
   manager(2),
   accountant(3),
-  viewer(4);
+  viewer(4),
+  partner(5);
 
   const UserRole(this.value);
   final int value;
@@ -147,6 +148,36 @@ enum ApprovalDecision {
         return 'Approved';
       case ApprovalDecision.rejected:
         return 'Rejected';
+    }
+  }
+}
+
+enum InviteStatus {
+  active(0),
+  accepted(1),
+  expired(2),
+  revoked(3);
+
+  const InviteStatus(this.value);
+  final int value;
+
+  static InviteStatus fromValue(int value) {
+    return InviteStatus.values.firstWhere(
+      (e) => e.value == value,
+      orElse: () => InviteStatus.active,
+    );
+  }
+
+  String get display {
+    switch (this) {
+      case InviteStatus.active:
+        return 'Active';
+      case InviteStatus.accepted:
+        return 'Accepted';
+      case InviteStatus.expired:
+        return 'Expired';
+      case InviteStatus.revoked:
+        return 'Revoked';
     }
   }
 }

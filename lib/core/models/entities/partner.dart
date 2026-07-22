@@ -17,6 +17,7 @@ class Partner extends Equatable {
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isActive;
+  final String? userId;
 
   const Partner({
     required this.id,
@@ -33,6 +34,7 @@ class Partner extends Equatable {
     required this.createdAt,
     required this.updatedAt,
     this.isActive = true,
+    this.userId,
   });
 
   bool get isStatusActive => status == PartnerStatus.active;
@@ -79,6 +81,7 @@ class Partner extends Equatable {
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isActive,
+    String? userId,
   }) {
     return Partner(
       id: id ?? this.id,
@@ -96,6 +99,7 @@ class Partner extends Equatable {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isActive: isActive ?? this.isActive,
+      userId: userId ?? this.userId,
     );
   }
 
@@ -115,6 +119,7 @@ class Partner extends Equatable {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'isActive': isActive,
+      'userId': userId,
     };
   }
 
@@ -135,6 +140,7 @@ class Partner extends Equatable {
       createdAt: DateTime.parse(map['createdAt'] as String),
       updatedAt: DateTime.parse(map['updatedAt'] as String),
       isActive: map['isActive'] as bool? ?? true,
+      userId: map['userId'] as String?,
     );
   }
 
@@ -164,6 +170,7 @@ class Partner extends Equatable {
         createdAt,
         updatedAt,
         isActive,
+        userId,
       ];
 
   @override
@@ -183,7 +190,8 @@ class Partner extends Equatable {
         other.description == description &&
         other.createdAt == createdAt &&
         other.updatedAt == updatedAt &&
-        other.isActive == isActive;
+        other.isActive == isActive &&
+        other.userId == userId;
   }
 
   @override
@@ -203,6 +211,7 @@ class Partner extends Equatable {
       createdAt,
       updatedAt,
       isActive,
+      userId,
     );
   }
 

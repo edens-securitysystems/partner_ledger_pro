@@ -18,6 +18,7 @@ class SheetsConfig {
   static const String sheetNotifications = 'notifications';
   static const String sheetUpdateRequests = 'partner_update_requests';
   static const String sheetApprovals = 'partner_approvals';
+  static const String sheetPartnerInvites = 'partner_invites';
 
   // ── API Actions (matching Apps Script doPost/eDoGet handlers) ─────────────
   static const String actionGetAll = 'getAll';
@@ -88,6 +89,7 @@ class SheetsConfig {
     'createdAt',
     'updatedAt',
     'isActive',
+    'userId',
   ];
 
   static const List<String> transactionsColumns = [
@@ -167,6 +169,22 @@ class SheetsConfig {
     'decidedAt',
   ];
 
+  static const List<String> partnerInvitesColumns = [
+    'id',
+    'businessId',
+    'businessName',
+    'createdByUserId',
+    'createdByEmail',
+    'token',
+    'status',
+    'acceptedByUserId',
+    'acceptedByEmail',
+    'acceptedByPartnerId',
+    'expiresAt',
+    'createdAt',
+    'updatedAt',
+  ];
+
   // ── Helper: Get columns for a sheet ───────────────────────────────────────
   static List<String> getColumnsForSheet(String sheet) {
     switch (sheet) {
@@ -186,6 +204,8 @@ class SheetsConfig {
         return updateRequestsColumns;
       case sheetApprovals:
         return approvalsColumns;
+      case sheetPartnerInvites:
+        return partnerInvitesColumns;
       default:
         return [];
     }

@@ -10,6 +10,7 @@ import 'package:workmanager/workmanager.dart';
 import 'core/config/app_config.dart';
 import 'core/config/firebase_options.dart';
 import 'core/providers/service_providers.dart';
+import 'core/services/deep_link_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/storage_service.dart';
 import 'theme/app_theme.dart';
@@ -55,6 +56,8 @@ void main() async {
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
+
+  DeepLinkService.instance.initialize(null);
 
   runApp(
     ProviderScope(

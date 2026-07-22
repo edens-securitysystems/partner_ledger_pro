@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../repositories/auth_repository.dart';
 import '../repositories/dashboard_repository.dart';
+import '../repositories/invite_repository.dart';
 import '../repositories/ledger_repository.dart';
 import '../repositories/notification_repository.dart';
 import '../repositories/partner_repository.dart';
@@ -68,6 +69,15 @@ final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
 
 final reportRepositoryProvider = Provider<ReportRepository>((ref) {
   return ReportRepository(
+    sheets: ref.watch(googleSheetsServiceProvider),
+    storage: ref.watch(storageServiceProvider),
+  );
+});
+
+// ── Invite Repository ────────────────────────────────────────────────────────
+
+final inviteRepositoryProvider = Provider<InviteRepository>((ref) {
+  return InviteRepository(
     sheets: ref.watch(googleSheetsServiceProvider),
     storage: ref.watch(storageServiceProvider),
   );

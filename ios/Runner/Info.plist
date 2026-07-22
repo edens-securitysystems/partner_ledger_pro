@@ -45,5 +45,22 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Partner Ledger Pro needs camera access to scan QR codes for partner invitations.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.partnerledgerpro.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>partnerledgerpro-dev</string>
+				<string>partnerledgerpro-staging</string>
+				<string>partnerledgerpro</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

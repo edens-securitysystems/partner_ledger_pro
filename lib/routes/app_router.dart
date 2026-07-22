@@ -15,6 +15,12 @@ import '../features/partners/screens/partner_detail_screen.dart';
 import '../features/partners/screens/partner_ledger_screen.dart';
 import '../features/partners/screens/add_edit_partner_screen.dart';
 import '../features/partners/screens/pending_approvals_screen.dart';
+import '../features/partners/screens/generate_qr_screen.dart';
+import '../features/partners/screens/qr_scanner_screen.dart';
+import '../features/partners/screens/invite_accept_screen.dart';
+import '../features/partners/screens/partner_dashboard_screen.dart';
+import '../features/partners/screens/partner_ledger_view_screen.dart';
+import '../features/partners/screens/partner_profit_share_screen.dart';
 import '../features/transactions/screens/transactions_list_screen.dart';
 import '../features/transactions/screens/add_edit_transaction_screen.dart';
 import '../features/transactions/screens/transaction_detail_screen.dart';
@@ -68,6 +74,12 @@ class RouteNames {
   static const addBusiness = 'add-business';
   static const editBusiness = 'edit-business';
   static const pendingApprovals = 'pending-approvals';
+  static const generateQr = 'generate-qr';
+  static const scanQr = 'scan-qr';
+  static const inviteAccept = 'invite-accept';
+  static const partnerDashboard = 'partner-dashboard';
+  static const partnerLedgerView = 'partner-ledger-view';
+  static const partnerProfitShare = 'partner-profit-share';
 }
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -340,7 +352,61 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
+
+          GoRoute(
+            path: '/generate-qr',
+            name: RouteNames.generateQr,
+            parentNavigatorKey: _rootNavigatorKey,
+            builder: (context, state) {
+              final params = state.uri.queryParameters;
+              return GenerateQrScreen(
+                businessId: params['businessId'] ?? '',
+                businessName: params['businessName'] ?? '',
+              );
+            },
+          ),
+
+          GoRoute(
+            path: '/scan-qr',
+            name: RouteNames.scanQr,
+            parentNavigatorKey: _rootNavigatorKey,
+            builder: (context, state) => const QrScannerScreen(),
+          ),
         ],
+      ),
+
+      GoRoute(
+        path: '/invite/accept',
+        name: RouteNames.inviteAccept,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final params = state.uri.queryParameters;
+          return InviteAcceptScreen(
+            token: params['token'] ?? '',
+            businessId: params['businessId'] ?? '',
+          );
+        },
+      ),
+
+      GoRoute(
+        path: '/partner-dashboard',
+        name: RouteNames.partnerDashboard,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const PartnerDashboardScreen(),
+      ),
+
+      GoRoute(
+        path: '/partner-ledger-view',
+        name: RouteNames.partnerLedgerView,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const PartnerLedgerViewScreen(),
+      ),
+
+      GoRoute(
+        path: '/partner-profit-share',
+        name: RouteNames.partnerProfitShare,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const PartnerProfitShareScreen(),
       ),
     ],
 

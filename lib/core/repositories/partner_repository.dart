@@ -32,6 +32,7 @@ class PartnerRepository {
       createdAt: _sheets.parseDate(row['createdAt']?.toString()),
       updatedAt: _sheets.parseDate(row['updatedAt']?.toString()),
       isActive: _sheets.parseBool(row['isActive']),
+      userId: row['userId']?.toString(),
     );
   }
 
@@ -51,6 +52,7 @@ class PartnerRepository {
       'createdAt': partner.createdAt.toIso8601String(),
       'updatedAt': partner.updatedAt.toIso8601String(),
       'isActive': partner.isActive,
+      'userId': partner.userId,
     };
   }
 
@@ -269,5 +271,29 @@ class PartnerRepository {
   Future<void> _cachePartners(List<Partner> partners) async {
     final json = partners.map((p) => p.toMap()).toList();
     await _storage.setPref('cached_partners', json.toString());
+  }
+
+  Future<ApiResponse<Partner>> getByUserId(String userId) async {
+    if (_sheets.isConfigured) {
+      final response = await _sheets.getByField(
+        SheetsConfig.sheetPartners,
+        'userId',
+        userId,
+      );
+      if (response.success && response.data != null) {
+        final rows = response.data!;
+        if (rows.isNotEmpty) {
+          return ApiResponse.success(data: _fromRow(rows.first));
+        }
+      }
+    }
+
+    final cached = await _getCachedPartners();
+    try {
+      final match = cached.firstWhere((p) => p.userId == userId);
+      return ApiResponse.success(data: match);
+    } catch (_) {
+      return ApiResponse.error(message: 'Partner not found');
+    }
   }
 }

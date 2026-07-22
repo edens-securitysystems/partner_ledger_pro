@@ -16,6 +16,7 @@ class User extends Equatable {
   final bool isActive;
   final String? pin;
   final bool biometricEnabled;
+  final String? partnerId;
 
   const User({
     required this.id,
@@ -31,9 +32,11 @@ class User extends Equatable {
     this.isActive = true,
     this.pin,
     this.biometricEnabled = false,
+    this.partnerId,
   });
 
   bool get isOwner => role == UserRole.owner;
+  bool get isPartner => role == UserRole.partner;
   bool get isAdmin => role == UserRole.admin || role == UserRole.owner;
   bool get isManager =>
       role == UserRole.manager ||
@@ -80,6 +83,7 @@ class User extends Equatable {
     bool? isActive,
     String? pin,
     bool? biometricEnabled,
+    String? partnerId,
   }) {
     return User(
       id: id ?? this.id,
@@ -95,6 +99,7 @@ class User extends Equatable {
       isActive: isActive ?? this.isActive,
       pin: pin ?? this.pin,
       biometricEnabled: biometricEnabled ?? this.biometricEnabled,
+      partnerId: partnerId ?? this.partnerId,
     );
   }
 
@@ -113,6 +118,7 @@ class User extends Equatable {
       'isActive': isActive,
       'pin': pin,
       'biometricEnabled': biometricEnabled,
+      'partnerId': partnerId,
     };
   }
 
@@ -133,6 +139,7 @@ class User extends Equatable {
       isActive: map['isActive'] as bool? ?? true,
       pin: map['pin'] as String?,
       biometricEnabled: map['biometricEnabled'] as bool? ?? false,
+      partnerId: map['partnerId'] as String?,
     );
   }
 
@@ -162,7 +169,8 @@ class User extends Equatable {
         other.lastLogin == lastLogin &&
         other.isActive == isActive &&
         other.pin == pin &&
-        other.biometricEnabled == biometricEnabled;
+        other.biometricEnabled == biometricEnabled &&
+        other.partnerId == partnerId;
   }
 
   @override
@@ -181,6 +189,7 @@ class User extends Equatable {
       isActive,
       pin,
       biometricEnabled,
+      partnerId,
     );
   }
 
@@ -205,6 +214,7 @@ class User extends Equatable {
         isActive,
         pin,
         biometricEnabled,
+        partnerId,
       ];
 
   Map<String, dynamic> toSessionMap() {
