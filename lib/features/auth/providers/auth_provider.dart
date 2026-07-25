@@ -143,6 +143,34 @@ class AuthNotifier extends StateNotifier<AuthState> {
     );
   }
 
+  Future<bool> updateProfile({String? name, String? phone, String? photo}) async {
+    state = state.copyWith(status: AuthStatus.loading);
+    final data = <String, dynamic>{};
+    if (name != null) data['name'] = name;
+    if (phone != null) data['phone'] = phone;
+    if (photo != null) data['photo'] = photo;
+    if (data.isEmpty) return true;
+
+    final response = await _authService.updateProfile(data);
+    if (response.success) {
+      final userResponse = await _authService.getCurrentUser();
+      if (userResponse.success && userResponse.data != null) {
+        state = AuthState.authenticated(userResponse.data!);
+        return true;
+      }
+    }
+    state = AuthState.authenticated(state.user!);
+    return false;
+  }
+
+  Future<String?> changePassword(String currentPassword, String newPassword) async {
+    final response = await _authService.changePassword(currentPassword, newPassword);
+    if (response.success) {
+      return null;
+    }
+    return response.message;
+  }
+
   void clearError() {
     state = state.copyWith(error: null, status: AuthStatus.unauthenticated);
   }

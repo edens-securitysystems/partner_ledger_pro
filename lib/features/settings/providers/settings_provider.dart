@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/enums.dart';
 import '../../../core/providers/service_providers.dart';
+import '../../../core/services/backup_service.dart';
 import '../../../core/services/storage_service.dart';
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -18,6 +19,8 @@ class SettingsState extends Equatable {
   final bool isBackingUp;
   final bool isRestoring;
   final String? lastBackupDate;
+  final BackupResult? lastBackupResult;
+  final RestoreResult? lastRestoreResult;
 
   const SettingsState({
     this.isLoading = false,
@@ -29,6 +32,8 @@ class SettingsState extends Equatable {
     this.isBackingUp = false,
     this.isRestoring = false,
     this.lastBackupDate,
+    this.lastBackupResult,
+    this.lastRestoreResult,
   });
 
   const SettingsState.initial() : this();
@@ -43,6 +48,8 @@ class SettingsState extends Equatable {
     bool? isBackingUp,
     bool? isRestoring,
     String? lastBackupDate,
+    BackupResult? lastBackupResult,
+    RestoreResult? lastRestoreResult,
   }) {
     return SettingsState(
       isLoading: isLoading ?? this.isLoading,
@@ -54,6 +61,8 @@ class SettingsState extends Equatable {
       isBackingUp: isBackingUp ?? this.isBackingUp,
       isRestoring: isRestoring ?? this.isRestoring,
       lastBackupDate: lastBackupDate ?? this.lastBackupDate,
+      lastBackupResult: lastBackupResult ?? this.lastBackupResult,
+      lastRestoreResult: lastRestoreResult ?? this.lastRestoreResult,
     );
   }
 
@@ -68,6 +77,8 @@ class SettingsState extends Equatable {
         isBackingUp,
         isRestoring,
         lastBackupDate,
+        lastBackupResult,
+        lastRestoreResult,
       ];
 }
 
@@ -75,8 +86,9 @@ class SettingsState extends Equatable {
 
 class SettingsNotifier extends StateNotifier<SettingsState> {
   final StorageService _storage;
+  final BackupService _backup;
 
-  SettingsNotifier(this._storage) : super(const SettingsState.initial());
+  SettingsNotifier(this._storage, this._backup) : super(const SettingsState.initial());
 
   void updateTheme(ThemeMode mode) {
     state = state.copyWith(themeMode: mode);
@@ -100,21 +112,40 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   Future<void> backupData() async {
     state = state.copyWith(isBackingUp: true, error: null);
     try {
-      await _storage.setLastSync(DateTime.now());
-      state = state.copyWith(
-        isBackingUp: false,
-        lastBackupDate: DateTime.now().toIso8601String(),
-      );
+      final result = await _backup.createBackup();
+      if (result.success && result.data != null) {
+        await _storage.setLastSync(DateTime.now());
+        state = state.copyWith(
+          isBackingUp: false,
+          lastBackupDate: DateTime.now().toIso8601String(),
+          lastBackupResult: result.data,
+        );
+      } else {
+        state = state.copyWith(
+          isBackingUp: false,
+          error: result.message,
+        );
+      }
     } catch (e) {
       state = state.copyWith(isBackingUp: false, error: e.toString());
     }
   }
 
-  Future<void> restoreData() async {
+  Future<void> restoreFromJson(String jsonStr) async {
     state = state.copyWith(isRestoring: true, error: null);
     try {
-      await loadSettings();
-      state = state.copyWith(isRestoring: false);
+      final result = await _backup.restoreFromJson(jsonStr);
+      if (result.success && result.data != null) {
+        state = state.copyWith(
+          isRestoring: false,
+          lastRestoreResult: result.data,
+        );
+      } else {
+        state = state.copyWith(
+          isRestoring: false,
+          error: result.message,
+        );
+      }
     } catch (e) {
       state = state.copyWith(isRestoring: false, error: e.toString());
     }
@@ -167,7 +198,8 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
 final settingsProvider =
     StateNotifierProvider<SettingsNotifier, SettingsState>((ref) {
   final storage = ref.watch(storageServiceProvider);
-  return SettingsNotifier(storage);
+  final backup = ref.watch(backupServiceProvider);
+  return SettingsNotifier(storage, backup);
 });
 
 final themeModeProvider = Provider<ThemeMode>((ref) {

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../repositories/partner_approval_repository.dart';
 import '../services/auth_service.dart';
+import '../services/backup_service.dart';
 import '../services/firebase_auth_service.dart';
 import '../services/google_sheets_service.dart';
 import '../services/notification_service.dart';
@@ -51,4 +52,11 @@ final partnerApprovalRepositoryProvider = Provider<PartnerApprovalRepository>((r
   final sheets = ref.watch(googleSheetsServiceProvider);
   final storage = ref.watch(storageServiceProvider);
   return PartnerApprovalRepository(sheets: sheets, storage: storage);
+});
+
+// ── Backup Service ────────────────────────────────────────────────
+
+final backupServiceProvider = Provider<BackupService>((ref) {
+  final sheets = ref.watch(googleSheetsServiceProvider);
+  return BackupService(sheets);
 });

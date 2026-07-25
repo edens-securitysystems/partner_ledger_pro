@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../auth/providers/auth_provider.dart';
 import '../../../widgets/common/app_bar_widget.dart';
 import '../../../widgets/forms/app_text_field.dart';
 
@@ -31,6 +32,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   late final Animation<Offset> _slideAnimation;
   late final AnimationController _expandController;
   late final Animation<double> _expandAnimation;
+  bool _loadedFromUser = false;
 
   @override
   void initState() {
@@ -69,6 +71,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     _slideController.dispose();
     _expandController.dispose();
     super.dispose();
+  }
+
+  void _loadUserIntoFields() {
+    if (_loadedFromUser) return;
+    final user = ref.read(currentUserProvider);
+    if (user != null) {
+      _nameController.text = user.name;
+      _emailController.text = user.email;
+      _phoneController.text = user.phone ?? '';
+      _photoPath = user.photo;
+      _loadedFromUser = true;
+    }
   }
 
   Future<void> _pickImage() async {
@@ -145,7 +159,52 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     setState(() => _isSaving = true);
 
     try {
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Update profile fields
+      final user = ref.read(currentUserProvider);
+      final name = _nameController.text.trim();
+      final phone = _phoneController.text.trim();
+
+      if (user != null &&
+          (name != user.name || phone != (user.phone ?? ''))) {
+        final success = await ref.read(authProvider.notifier).updateProfile(
+              name: name != user.name ? name : null,
+              phone: phone != (user.phone ?? '') ? phone : null,
+              photo: _photoPath,
+            );
+        if (!success) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Failed to update profile'),
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      // Change password if section is open
+      if (_showChangePassword &&
+          _currentPasswordController.text.isNotEmpty) {
+        final error =
+            await ref.read(authProvider.notifier).changePassword(
+                  _currentPasswordController.text,
+                  _newPasswordController.text,
+                );
+        if (error != null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(error),
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -184,6 +243,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    _loadUserIntoFields();
 
     return Scaffold(
       appBar: AppBarWidget(
@@ -245,17 +305,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 prefixIcon: Icons.email_outlined,
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
-                validator: (value) {
-                  if (value != null && value.trim().isNotEmpty) {
-                    final emailRegex = RegExp(
-                      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
-                    );
-                    if (!emailRegex.hasMatch(value.trim())) {
-                      return 'Enter a valid email address';
-                    }
-                  }
-                  return null;
-                },
+                enabled: false,
               ),
               const SizedBox(height: 16),
               AppTextField(
