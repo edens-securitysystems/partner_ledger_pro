@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/models/dto/report_dto.dart';
+import '../../partners/providers/partner_provider.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/common/app_bar_widget.dart';
 import '../providers/report_provider.dart';
@@ -40,6 +41,7 @@ class _YearlyReportScreenState extends ConsumerState<YearlyReportScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(partnersProvider.notifier).fetchAll();
       ref.read(reportProvider.notifier).generateYearly(_selectedYear);
     });
   }
@@ -170,31 +172,38 @@ class _YearlyReportScreenState extends ConsumerState<YearlyReportScreen> {
   }
 
   List<ReportStat> _buildYearStats() {
+    final reportData = ref.watch(reportProvider).reportData;
+    final totalIncome = reportData?.totalIncome ?? 0;
+    final totalExpense = reportData?.totalExpense ?? 0;
+    final totalProfit = reportData?.totalProfit ?? 0;
+    final margin = totalIncome > 0 ? (totalProfit / totalIncome) * 100 : 0.0;
+    final totalTxns = reportData?.monthlyReports.fold<int>(0, (s, m) => s + m.transactionCount) ?? 0;
+
     return [
-      const ReportStat(
+      ReportStat(
         title: 'Total Income',
-        value: '₹32.40L',
+        value: '₹${_formatAmount(totalIncome)}',
         icon: Icons.trending_up_rounded,
         color: AppColors.profit,
         subtitle: 'Year total',
       ),
-      const ReportStat(
+      ReportStat(
         title: 'Total Expense',
-        value: '₹21.60L',
+        value: '₹${_formatAmount(totalExpense)}',
         icon: Icons.trending_down_rounded,
         color: AppColors.debit,
         subtitle: 'Year total',
       ),
-      const ReportStat(
+      ReportStat(
         title: 'Net Profit',
-        value: '₹10.80L',
+        value: '₹${_formatAmount(totalProfit)}',
         icon: Icons.account_balance_rounded,
-        color: AppColors.profit,
-        subtitle: '33.3% margin',
+        color: totalProfit >= 0 ? AppColors.profit : AppColors.loss,
+        subtitle: '${margin.toStringAsFixed(1)}% margin',
       ),
       ReportStat(
         title: 'Transactions',
-        value: '${12 * 47}',
+        value: '$totalTxns',
         icon: Icons.receipt_long_rounded,
         color: AppColors.chartPalette[4],
         subtitle: 'Year total',
@@ -204,12 +213,19 @@ class _YearlyReportScreenState extends ConsumerState<YearlyReportScreen> {
 
   Widget _buildMonthlyComparisonChart(BuildContext context) {
     final theme = Theme.of(context);
-    final incomeData = [
-      2.2, 2.5, 2.8, 2.6, 3.0, 2.9, 3.2, 3.1, 2.7, 3.0, 3.2, 3.2,
-    ];
-    final expenseData = [
-      1.5, 1.6, 1.8, 1.7, 2.0, 1.9, 2.1, 2.0, 1.8, 1.9, 2.0, 2.3,
-    ];
+    final reportData = ref.watch(reportProvider).reportData;
+    final monthlyReports = reportData?.monthlyReports ?? [];
+
+    final incomeData = List<double>.filled(12, 0);
+    final expenseData = List<double>.filled(12, 0);
+    for (final m in monthlyReports) {
+      final idx = (m.month - 1).clamp(0, 11);
+      incomeData[idx] = m.income / 100000;
+      expenseData[idx] = m.expense / 100000;
+    }
+
+    final maxYVal = [...incomeData, ...expenseData]
+        .fold<double>(0, (a, b) => a > b ? a : b);
 
     return ReportChartSection(
       title: 'Monthly Comparison',
@@ -220,7 +236,7 @@ class _YearlyReportScreenState extends ConsumerState<YearlyReportScreen> {
       child: BarChart(
         BarChartData(
           alignment: BarChartAlignment.spaceAround,
-          maxY: 4,
+          maxY: maxYVal > 0 ? (maxYVal * 1.15) : 4,
           minY: 0,
           barTouchData: BarTouchData(
             touchTooltipData: BarTouchTooltipData(
@@ -268,7 +284,7 @@ class _YearlyReportScreenState extends ConsumerState<YearlyReportScreen> {
               sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 36,
-                interval: 1,
+                interval: maxYVal > 0 ? (maxYVal / 4) : 1,
                 getTitlesWidget: (value, meta) => Text(
                   '₹${value.toInt()}L',
                   style: theme.textTheme.labelSmall?.copyWith(
@@ -281,7 +297,7 @@ class _YearlyReportScreenState extends ConsumerState<YearlyReportScreen> {
           gridData: FlGridData(
             show: true,
             drawVerticalLine: false,
-            horizontalInterval: 1,
+            horizontalInterval: maxYVal > 0 ? (maxYVal / 4) : 1,
             getDrawingHorizontalLine: (value) => FlLine(
               color: theme.colorScheme.outlineVariant
                   .withValues(alpha: 0.4),
@@ -318,11 +334,26 @@ class _YearlyReportScreenState extends ConsumerState<YearlyReportScreen> {
   Widget _buildQuarterlyBreakdown(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final reportData = ref.watch(reportProvider).reportData;
+    final monthlyReports = reportData?.monthlyReports ?? [];
+
+    double quarterIncome(int startMonth, int endMonth) {
+      return monthlyReports
+          .where((m) => m.month >= startMonth && m.month <= endMonth)
+          .fold<double>(0, (s, m) => s + m.income);
+    }
+
+    double quarterExpense(int startMonth, int endMonth) {
+      return monthlyReports
+          .where((m) => m.month >= startMonth && m.month <= endMonth)
+          .fold<double>(0, (s, m) => s + m.expense);
+    }
+
     final quarters = [
-      _QuarterData('Q1 (Jan-Mar)', 7.5, 4.9),
-      _QuarterData('Q2 (Apr-Jun)', 8.5, 5.6),
-      _QuarterData('Q3 (Jul-Sep)', 9.0, 5.9),
-      _QuarterData('Q4 (Oct-Dec)', 9.4, 6.2),
+      _QuarterData('Q1 (Jan-Mar)', quarterIncome(1, 3), quarterExpense(1, 3)),
+      _QuarterData('Q2 (Apr-Jun)', quarterIncome(4, 6), quarterExpense(4, 6)),
+      _QuarterData('Q3 (Jul-Sep)', quarterIncome(7, 9), quarterExpense(7, 9)),
+      _QuarterData('Q4 (Oct-Dec)', quarterIncome(10, 12), quarterExpense(10, 12)),
     ];
 
     return Card(
@@ -375,13 +406,10 @@ class _YearlyReportScreenState extends ConsumerState<YearlyReportScreen> {
   Widget _buildTopPartners(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final partners = [
-      _PartnerProfit('Rajesh Kumar', 380000, 25.0),
-      _PartnerProfit('Priya Sharma', 290000, 20.0),
-      _PartnerProfit('Amit Patel', 225000, 15.0),
-      _PartnerProfit('Sneha Reddy', 195000, 12.0),
-      _PartnerProfit('Vikram Singh', 150000, 10.0),
-    ];
+    final partnersState = ref.watch(partnersProvider);
+    final partners = partnersState.partners;
+    final reportData = ref.watch(reportProvider).reportData;
+    final totalProfit = reportData?.totalProfit ?? 1;
 
     return Card(
       elevation: 0,
@@ -421,46 +449,60 @@ class _YearlyReportScreenState extends ConsumerState<YearlyReportScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          ...List.generate(partners.length, (i) {
-            final p = partners[i];
-            return ListTile(
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-              leading: CircleAvatar(
-                radius: 16,
-                backgroundColor: AppColors.chartPalette[
-                        i % AppColors.chartPalette.length]
-                    .withValues(alpha: 0.15),
-                child: Text(
-                  (i + 1).toString(),
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.chartPalette[
-                        i % AppColors.chartPalette.length],
-                  ),
-                ),
-              ),
-              title: Text(
-                p.name,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              subtitle: Text(
-                '${p.ownership}% ownership',
+          if (partners.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'No partners found',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
-              trailing: Text(
-                '₹${_formatAmount(p.profit)}',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.profit,
+            )
+          else
+            ...List.generate(partners.length, (i) {
+              final p = partners[i];
+              final profitShare = totalProfit > 0
+                  ? totalProfit * (p.ownershipPercentage / 100)
+                  : 0.0;
+              return ListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                leading: CircleAvatar(
+                  radius: 16,
+                  backgroundColor: AppColors.chartPalette[
+                          i % AppColors.chartPalette.length]
+                      .withValues(alpha: 0.15),
+                  child: Text(
+                    (i + 1).toString(),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.chartPalette[
+                          i % AppColors.chartPalette.length],
+                    ),
+                  ),
                 ),
-              ),
-            );
-          }),
+                title: Text(
+                  p.name,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                subtitle: Text(
+                  '${p.ownershipPercentage.toStringAsFixed(1)}% ownership',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                trailing: Text(
+                  '₹${_formatAmount(profitShare)}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.profit,
+                  ),
+                ),
+              );
+            }),
         ],
       ),
     );
@@ -485,9 +527,13 @@ class _YearlyReportScreenState extends ConsumerState<YearlyReportScreen> {
   }
 
   void _shareReport() {
+    final reportData = ref.read(reportProvider).reportData;
+    final totalIncome = reportData?.totalIncome ?? 0;
+    final totalExpense = reportData?.totalExpense ?? 0;
+    final totalProfit = reportData?.totalProfit ?? 0;
     Share.share(
       'Yearly Report - $_selectedYear\n'
-      'Income: ₹32.40L | Expense: ₹21.60L | Profit: ₹10.80L',
+      'Income: ₹${_formatAmount(totalIncome)} | Expense: ₹${_formatAmount(totalExpense)} | Profit: ₹${_formatAmount(totalProfit)}',
       subject: 'Yearly Report - $_selectedYear',
     );
   }
@@ -515,6 +561,8 @@ class _QuarterData {
 
   double get profit => income - expense;
   double get margin => income > 0 ? (profit / income) * 100 : 0;
+  double get incomeL => income / 100000;
+  double get expenseL => expense / 100000;
 }
 
 class _QuarterTile extends StatelessWidget {
@@ -542,7 +590,7 @@ class _QuarterTile extends StatelessWidget {
                 ),
               ),
               Text(
-                '₹${data.income.toStringAsFixed(1)}L',
+                '₹${data.incomeL.toStringAsFixed(1)}L',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: AppColors.profit,
                   fontWeight: FontWeight.w600,
@@ -550,7 +598,7 @@ class _QuarterTile extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                '₹${data.expense.toStringAsFixed(1)}L',
+                '₹${data.expenseL.toStringAsFixed(1)}L',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: AppColors.debit,
                   fontWeight: FontWeight.w600,
@@ -588,14 +636,6 @@ class _QuarterTile extends StatelessWidget {
       ),
     );
   }
-}
-
-class _PartnerProfit {
-  final String name;
-  final double profit;
-  final double ownership;
-
-  const _PartnerProfit(this.name, this.profit, this.ownership);
 }
 
 class _YoYLineChart extends StatelessWidget {

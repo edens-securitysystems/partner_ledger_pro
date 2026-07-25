@@ -160,7 +160,10 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
   Widget _buildNetCashFlowCard(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    const netCashFlow = 185000.0;
+    final reportData = ref.watch(reportProvider).reportData;
+    final totalIncome = reportData?.totalIncome ?? 0;
+    final totalExpense = reportData?.totalExpense ?? 0;
+    final netCashFlow = totalIncome - totalExpense;
     final isPositive = netCashFlow >= 0;
 
     return Card(
@@ -242,63 +245,92 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
   }
 
   Widget _buildOperatingActivities(BuildContext context) {
+    final reportData = ref.watch(reportProvider).reportData;
+    final categories = reportData?.categoryBreakdown ?? [];
+
+    final incomeItems = categories
+        .where((c) => (c['income'] as double) > 0)
+        .map((c) => _ActivityItem(c['category'] as String, c['income'] as double, true))
+        .toList();
+    final expenseItems = categories
+        .where((c) => (c['expense'] as double) > 0)
+        .map((c) => _ActivityItem(c['category'] as String, c['expense'] as double, false))
+        .toList();
+
+    final allItems = [...incomeItems, ...expenseItems];
+    final subtotal = allItems.fold<double>(0, (s, i) => s + (i.isPositive ? i.amount : -i.amount));
+
     return _ActivitySection(
       title: 'Operating Activities',
       icon: Icons.business_center_rounded,
       color: AppColors.chartPalette[0],
-      items: const [
-        _ActivityItem('Cash from Sales', 325000, true),
-        _ActivityItem('Cash from Services', 185000, true),
-        _ActivityItem('Cash from Commissions', 75000, true),
-        _ActivityItem('Supplier Payments', -125000, false),
-        _ActivityItem('Salary Payments', -145000, false),
-        _ActivityItem('Rent & Utilities', -52000, false),
-        _ActivityItem('Other Operating Expenses', -28000, false),
-      ],
-      subtotal: 235000,
+      items: allItems.isNotEmpty ? allItems : [const _ActivityItem('No data available', 0, true)],
+      subtotal: subtotal,
     );
   }
 
   Widget _buildInvestingActivities(BuildContext context) {
+    final reportData = ref.watch(reportProvider).reportData;
+    final partnerBreakdown = reportData?.partnerBreakdown ?? [];
+
+    final items = partnerBreakdown
+        .where((p) => (p['income'] as double) > 0)
+        .map((p) => _ActivityItem(
+              'Partner: ${p['partnerId']}',
+              p['income'] as double,
+              true,
+            ))
+        .toList();
+
+    final subtotal = items.fold<double>(0, (s, i) => s + i.amount);
+
     return _ActivitySection(
-      title: 'Investing Activities',
+      title: 'Partner Investments',
       icon: Icons.show_chart_rounded,
       color: AppColors.chartPalette[1],
-      items: const [
-        _ActivityItem('Equipment Purchase', -85000, false),
-        _ActivityItem('Asset Sale', 32000, true),
-        _ActivityItem('Investment Returns', 18000, true),
-      ],
-      subtotal: -35000,
+      items: items.isNotEmpty ? items : [const _ActivityItem('No investment data', 0, true)],
+      subtotal: subtotal,
     );
   }
 
   Widget _buildFinancingActivities(BuildContext context) {
+    final reportData = ref.watch(reportProvider).reportData;
+    final totalIncome = reportData?.totalIncome ?? 0;
+    final totalExpense = reportData?.totalExpense ?? 0;
+    final profit = totalIncome - totalExpense;
+
     return _ActivitySection(
-      title: 'Financing Activities',
+      title: 'Net Position Summary',
       icon: Icons.account_balance_rounded,
       color: AppColors.chartPalette[4],
-      items: const [
-        _ActivityItem('Partner Investment', 150000, true),
-        _ActivityItem('Loan Received', 85000, true),
-        _ActivityItem('Loan Repayment', -65000, false),
-        _ActivityItem('Partner Withdrawal', -185000, false),
+      items: [
+        _ActivityItem('Total Inflows', totalIncome, true),
+        _ActivityItem('Total Outflows', totalExpense, false),
       ],
-      subtotal: -15000,
+      subtotal: profit,
     );
   }
 
   Widget _buildCashFlowBarChart(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    final operating = [38.0, 42.0, 35.0, 48.0, 40.0, 45.0];
-    final investing = [-8.0, -5.0, -12.0, -3.0, -8.0, -5.0];
-    final financing = [5.0, -2.0, 8.0, -5.0, 3.0, -10.0];
+    final reportData = ref.watch(reportProvider).reportData;
+    final monthlyReports = reportData?.monthlyReports ?? [];
+
+    final months = monthlyReports.map((m) {
+      const abbrs = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return abbrs[(m.month - 1).clamp(0, 11)];
+    }).toList();
+
+    final operating = monthlyReports.map((m) => (m.income - m.expense) / 1000).toList();
+
+    final maxYVal = operating.fold<double>(0, (a, b) => a > b ? a : b);
+    final minYVal = operating.fold<double>(0, (a, b) => a < b ? a : b);
 
     return ReportChartSection(
       title: 'Monthly Cash Flow',
-      subtitle: 'Cash flow by activity type',
+      subtitle: 'Net cash flow by month',
       icon: Icons.bar_chart_rounded,
       iconColor: AppColors.chartPalette[0],
       height: 280,
@@ -310,123 +342,105 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
             children: [
               _LegendDot(
                 color: AppColors.chartPalette[0],
-                label: 'Operating',
-              ),
-              const SizedBox(width: 12),
-              _LegendDot(
-                color: AppColors.chartPalette[1],
-                label: 'Investing',
-              ),
-              const SizedBox(width: 12),
-              _LegendDot(
-                color: AppColors.chartPalette[4],
-                label: 'Financing',
+                label: 'Net Flow',
               ),
             ],
           ),
           const SizedBox(height: 8),
           Expanded(
-            child: BarChart(
-              BarChartData(
-                alignment: BarChartAlignment.spaceAround,
-                maxY: 60,
-                minY: -20,
-                barTouchData: BarTouchData(
-                  touchTooltipData: BarTouchTooltipData(
-                    getTooltipColor: (_) => colorScheme.inverseSurface,
-                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                      return BarTooltipItem(
-                        '₹${rod.toY.toStringAsFixed(0)}K',
-                        TextStyle(
-                          color: colorScheme.onInverseSurface,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 11,
+            child: months.isEmpty
+                ? const Center(child: Text('No data available'))
+                : BarChart(
+                    BarChartData(
+                      alignment: BarChartAlignment.spaceAround,
+                      maxY: maxYVal > 0 ? maxYVal * 1.1 : 60,
+                      minY: minYVal < 0 ? minYVal * 1.1 : -10,
+                      barTouchData: BarTouchData(
+                        touchTooltipData: BarTouchTooltipData(
+                          getTooltipColor: (_) => colorScheme.inverseSurface,
+                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                            return BarTooltipItem(
+                              '₹${rod.toY.toStringAsFixed(0)}K',
+                              TextStyle(
+                                color: colorScheme.onInverseSurface,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 11,
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
-                ),
-                titlesData: FlTitlesData(
-                  topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 20,
-                      getTitlesWidget: (value, meta) {
-                        final idx = value.toInt();
-                        if (idx < 0 || idx >= months.length) {
-                          return const SizedBox.shrink();
-                        }
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            months[idx],
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
+                      ),
+                      titlesData: FlTitlesData(
+                        topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 20,
+                            interval: (months.length / 6).ceilToDouble().clamp(1, double.infinity),
+                            getTitlesWidget: (value, meta) {
+                              final idx = value.toInt();
+                              if (idx < 0 || idx >= months.length) {
+                                return const SizedBox.shrink();
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  months[idx],
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 32,
+                            interval: (maxYVal > 0 ? maxYVal / 4 : 15),
+                            getTitlesWidget: (value, meta) => Text(
+                              '${value.toInt()}K',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ),
-                        );
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 32,
-                      interval: 20,
-                      getTitlesWidget: (value, meta) => Text(
-                        '${value.toInt()}K',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: (maxYVal > 0 ? maxYVal / 4 : 15),
+                        getDrawingHorizontalLine: (value) => FlLine(
+                          color: colorScheme.outlineVariant
+                              .withValues(alpha: 0.4),
+                          strokeWidth: 1,
+                        ),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      barGroups: List.generate(months.length, (i) {
+                        final val = operating[i];
+                        return BarChartGroupData(
+                          x: i,
+                          barRods: [
+                            BarChartRodData(
+                              toY: val,
+                              color: val >= 0
+                                  ? AppColors.chartPalette[0]
+                                  : AppColors.chartPalette[1],
+                              width: 12,
+                              borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(3)),
+                            ),
+                          ],
+                        );
+                      }),
                     ),
                   ),
-                ),
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  horizontalInterval: 20,
-                  getDrawingHorizontalLine: (value) => FlLine(
-                    color: colorScheme.outlineVariant
-                        .withValues(alpha: 0.4),
-                    strokeWidth: 1,
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                barGroups: List.generate(months.length, (i) {
-                  return BarChartGroupData(
-                    x: i,
-                    barRods: [
-                      BarChartRodData(
-                        toY: operating[i],
-                        color: AppColors.chartPalette[0],
-                        width: 8,
-                        borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(3)),
-                      ),
-                      BarChartRodData(
-                        toY: investing[i],
-                        color: AppColors.chartPalette[1],
-                        width: 8,
-                        borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(3)),
-                      ),
-                      BarChartRodData(
-                        toY: financing[i],
-                        color: AppColors.chartPalette[4],
-                        width: 8,
-                        borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(3)),
-                      ),
-                    ],
-                  );
-                }),
-              ),
-            ),
           ),
         ],
       ),

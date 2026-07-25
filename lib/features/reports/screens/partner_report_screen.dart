@@ -4,8 +4,10 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/models/dto/report_dto.dart';
+import '../../../core/models/entities/partner.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/common/app_bar_widget.dart';
+import '../../partners/providers/partner_provider.dart';
 import '../providers/report_provider.dart';
 import '../widgets/report_chart.dart';
 import '../widgets/report_summary.dart';
@@ -23,19 +25,12 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 365));
   DateTime _endDate = DateTime.now();
 
-  final _partnerOptions = const [
-    _PartnerOption('1', 'Rajesh Kumar', 500000, 25.0),
-    _PartnerOption('2', 'Priya Sharma', 350000, 20.0),
-    _PartnerOption('3', 'Amit Patel', 300000, 15.0),
-    _PartnerOption('4', 'Sneha Reddy', 250000, 12.0),
-    _PartnerOption('5', 'Vikram Singh', 200000, 10.0),
-  ];
-
   @override
   void initState() {
     super.initState();
-    _selectedPartnerId = '1';
-    WidgetsBinding.instance.addPostFrameCallback((_) => _generateReport());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(partnersProvider.notifier).fetchAll();
+    });
   }
 
   void _generateReport() {
@@ -50,10 +45,21 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(reportProvider);
-    final selectedPartner = _partnerOptions.firstWhere(
-      (p) => p.id == _selectedPartnerId,
-      orElse: () => _partnerOptions.first,
-    );
+    final partnersState = ref.watch(partnersProvider);
+    final partners = partnersState.partners;
+    final reportData = state.reportData;
+
+    if (_selectedPartnerId == null && partners.isNotEmpty) {
+      _selectedPartnerId = partners.first.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _generateReport());
+    }
+
+    final selectedPartner = _selectedPartnerId != null
+        ? partners.firstWhere(
+            (p) => p.id == _selectedPartnerId,
+            orElse: () => partners.first,
+          )
+        : null;
 
     return Scaffold(
       appBar: AppBarWidget(
@@ -87,7 +93,7 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
           ),
         ],
       ),
-      body: state.isLoading
+      body: state.isLoading || partnersState.isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -95,26 +101,30 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildPartnerSelector(context),
+                  _buildPartnerSelector(context, partners),
                   const SizedBox(height: 16),
                   _buildDateRangeSelector(context),
                   const SizedBox(height: 16),
-                  ReportSummary(stats: _buildPartnerStats(selectedPartner)),
+                  ReportSummary(
+                      stats: _buildPartnerStats(selectedPartner, reportData)),
                   const SizedBox(height: 16),
-                  _buildCapitalVsProfitChart(context),
+                  if (reportData != null && reportData.monthlyReports.isNotEmpty)
+                    _buildCapitalVsProfitChart(context, reportData),
                   const SizedBox(height: 16),
-                  _buildTransactionHistoryChart(context),
+                  if (reportData != null && reportData.categoryBreakdown.isNotEmpty)
+                    _buildTransactionHistoryChart(context, reportData),
                   const SizedBox(height: 16),
-                  _buildLedgerSummary(context, selectedPartner),
+                  if (selectedPartner != null)
+                    _buildLedgerSummary(context, selectedPartner, reportData),
                   const SizedBox(height: 16),
-                  _buildPartnerComparison(context),
+                  _buildPartnerComparison(context, partners, reportData),
                 ],
               ),
             ),
     );
   }
 
-  Widget _buildPartnerSelector(BuildContext context) {
+  Widget _buildPartnerSelector(BuildContext context, List<Partner> partners) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -136,35 +146,43 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _partnerOptions.map((partner) {
-                final isSelected = partner.id == _selectedPartnerId;
-                return ChoiceChip(
-                  label: Text(partner.name),
-                  selected: isSelected,
-                  onSelected: (_) {
-                    setState(() => _selectedPartnerId = partner.id);
-                    _generateReport();
-                  },
-                  selectedColor: colorScheme.primaryContainer,
-                  checkmarkColor: colorScheme.primary,
-                  side: BorderSide(
-                    color: isSelected
-                        ? colorScheme.primary.withValues(alpha: 0.5)
-                        : colorScheme.outlineVariant,
-                  ),
-                  labelStyle: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight:
-                        isSelected ? FontWeight.w600 : FontWeight.w500,
-                    color: isSelected
-                        ? colorScheme.primary
-                        : colorScheme.onSurfaceVariant,
-                  ),
-                );
-              }).toList(),
-            ),
+            if (partners.isEmpty)
+              Text(
+                'No partners found. Add partners first.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: partners.map((partner) {
+                  final isSelected = partner.id == _selectedPartnerId;
+                  return ChoiceChip(
+                    label: Text(partner.name),
+                    selected: isSelected,
+                    onSelected: (_) {
+                      setState(() => _selectedPartnerId = partner.id);
+                      _generateReport();
+                    },
+                    selectedColor: colorScheme.primaryContainer,
+                    checkmarkColor: colorScheme.primary,
+                    side: BorderSide(
+                      color: isSelected
+                          ? colorScheme.primary.withValues(alpha: 0.5)
+                          : colorScheme.outlineVariant,
+                    ),
+                    labelStyle: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.w500,
+                      color: isSelected
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
+                    ),
+                  );
+                }).toList(),
+              ),
           ],
         ),
       ),
@@ -232,49 +250,68 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
     );
   }
 
-  List<ReportStat> _buildPartnerStats(_PartnerOption partner) {
+  List<ReportStat> _buildPartnerStats(
+      Partner? partner, ReportResponse? reportData) {
+    final capital = partner?.capital ?? 0;
+    final ownership = partner?.ownershipPercentage ?? 0;
+    final totalIncome = reportData?.totalIncome ?? 0;
+    final totalProfit = reportData?.totalProfit ?? 0;
+    final totalTxnCount =
+        reportData?.monthlyReports.fold<int>(0, (sum, m) => sum + m.transactionCount) ?? 0;
+
     return [
       ReportStat(
         title: 'Capital Invested',
-        value: '₹${_formatAmount(partner.capital)}',
+        value: '₹${_formatAmount(capital)}',
         icon: Icons.account_balance_rounded,
         color: AppColors.investment,
-        subtitle: '${partner.ownership}% ownership',
+        subtitle: '${ownership.toStringAsFixed(1)}% ownership',
       ),
-      const ReportStat(
-        title: 'Total Profit Share',
-        value: '₹3.80L',
+      ReportStat(
+        title: 'Total Profit',
+        value: '₹${_formatAmount(totalProfit)}',
         icon: Icons.trending_up_rounded,
-        color: AppColors.profit,
+        color: totalProfit >= 0 ? AppColors.profit : AppColors.loss,
         subtitle: 'This period',
       ),
       ReportStat(
         title: 'Total Transactions',
-        value: '28',
+        value: '$totalTxnCount',
         icon: Icons.receipt_long_rounded,
         color: AppColors.chartPalette[4],
         subtitle: 'In period',
       ),
       ReportStat(
-        title: 'Current Balance',
-        value: '₹4.20L',
-        icon: Icons.account_balance_wallet_rounded,
+        title: 'Profit Margin',
+        value: '${totalIncome > 0 ? ((totalProfit / totalIncome) * 100).toStringAsFixed(1) : '0.0'}%',
+        icon: Icons.percent_rounded,
         color: AppColors.chartPalette[0],
-        subtitle: 'Available',
+        subtitle: 'Income margin',
       ),
     ];
   }
 
-  Widget _buildCapitalVsProfitChart(BuildContext context) {
+  Widget _buildCapitalVsProfitChart(
+      BuildContext context, ReportResponse reportData) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    final capitalData = [50.0, 50.0, 52.0, 52.0, 55.0, 55.0];
-    final profitData = [0.8, 1.2, 0.9, 1.5, 1.1, 1.3];
+    final monthlyReports = reportData.monthlyReports;
+    final months = monthlyReports
+        .map((m) => _monthAbbr(m.month))
+        .toList();
+    final capitalData = List.generate(
+        monthlyReports.length, (i) => monthlyReports[i].income / 1000);
+    final profitData = List.generate(
+        monthlyReports.length, (i) => monthlyReports[i].profit / 1000);
+
+    final maxY = [
+      ...capitalData,
+      ...profitData.map((v) => v.abs())
+    ].fold<double>(0, (a, b) => a > b ? a : b);
 
     return ReportChartSection(
-      title: 'Capital vs Profit',
-      subtitle: 'Monthly capital and profit trend',
+      title: 'Income vs Profit',
+      subtitle: 'Monthly income and profit trend',
       icon: Icons.compare_arrows_rounded,
       iconColor: AppColors.chartPalette[5],
       height: 240,
@@ -283,15 +320,9 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _LegendDot(
-                color: AppColors.investment,
-                label: 'Capital (₹K)',
-              ),
+              _LegendDot(color: AppColors.investment, label: 'Income (₹K)'),
               const SizedBox(width: 16),
-              _LegendDot(
-                color: AppColors.profit,
-                label: 'Profit (₹K)',
-              ),
+              _LegendDot(color: AppColors.profit, label: 'Profit (₹K)'),
             ],
           ),
           const SizedBox(height: 12),
@@ -301,10 +332,9 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval: 15,
+                  horizontalInterval: maxY > 0 ? (maxY / 4) : 1,
                   getDrawingHorizontalLine: (value) => FlLine(
-                    color: colorScheme.outlineVariant
-                        .withValues(alpha: 0.4),
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.4),
                     strokeWidth: 1,
                   ),
                 ),
@@ -317,6 +347,7 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 20,
+                      interval: (months.length / 6).ceilToDouble().clamp(1, double.infinity),
                       getTitlesWidget: (value, meta) {
                         final idx = value.toInt();
                         if (idx < 0 || idx >= months.length) {
@@ -338,7 +369,7 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 32,
-                      interval: 15,
+                      interval: maxY > 0 ? (maxY / 4) : 1,
                       getTitlesWidget: (value, meta) => Text(
                         '${value.toInt()}K',
                         style: theme.textTheme.labelSmall?.copyWith(
@@ -350,9 +381,9 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
                 ),
                 borderData: FlBorderData(show: false),
                 minX: 0,
-                maxX: 5,
+                maxX: (months.length - 1).toDouble().clamp(0, double.infinity),
                 minY: 0,
-                maxY: 65,
+                maxY: maxY > 0 ? maxY * 1.2 : 10,
                 lineBarsData: [
                   LineChartBarData(
                     spots: List.generate(
@@ -385,22 +416,24 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
     );
   }
 
-  Widget _buildTransactionHistoryChart(BuildContext context) {
+  Widget _buildTransactionHistoryChart(
+      BuildContext context, ReportResponse reportData) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final categories = ['Sales', 'Services', 'Commission', 'Investment', 'Other'];
-    final amounts = [120000.0, 85000.0, 45000.0, 50000.0, 25000.0];
+    final categories = reportData.categoryBreakdown;
+    final maxVal = categories.fold<double>(
+        0, (max, c) => (c['total'] as double) > max ? (c['total'] as double) : max);
 
     return ReportChartSection(
-      title: 'Transaction History',
-      subtitle: 'Category-wise transaction amounts',
+      title: 'Category Breakdown',
+      subtitle: 'Transaction amounts by category',
       icon: Icons.history_rounded,
       iconColor: AppColors.chartPalette[2],
       height: 220,
       child: BarChart(
         BarChartData(
           alignment: BarChartAlignment.spaceAround,
-          maxY: 140000,
+          maxY: maxVal > 0 ? maxVal * 1.1 : 100000,
           barTouchData: BarTouchData(
             touchTooltipData: BarTouchTooltipData(
               getTooltipColor: (_) => colorScheme.inverseSurface,
@@ -425,15 +458,17 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
               sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 24,
+                interval: 1,
                 getTitlesWidget: (value, meta) {
                   final idx = value.toInt();
                   if (idx < 0 || idx >= categories.length) {
                     return const SizedBox.shrink();
                   }
+                  final label = categories[idx]['category'] as String;
                   return Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      categories[idx],
+                      label.length > 8 ? '${label.substring(0, 8)}..' : label,
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -448,10 +483,9 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
           gridData: FlGridData(
             show: true,
             drawVerticalLine: false,
-            horizontalInterval: 35000,
+            horizontalInterval: maxVal > 0 ? maxVal / 4 : 25000,
             getDrawingHorizontalLine: (value) => FlLine(
-              color:
-                  colorScheme.outlineVariant.withValues(alpha: 0.4),
+              color: colorScheme.outlineVariant.withValues(alpha: 0.4),
               strokeWidth: 1,
             ),
           ),
@@ -461,7 +495,7 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
               x: i,
               barRods: [
                 BarChartRodData(
-                  toY: amounts[i],
+                  toY: categories[i]['total'] as double,
                   color: AppColors.chartPalette[
                       i % AppColors.chartPalette.length],
                   width: 20,
@@ -477,9 +511,12 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
   }
 
   Widget _buildLedgerSummary(
-      BuildContext context, _PartnerOption partner) {
+      BuildContext context, Partner partner, ReportResponse? reportData) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final totalIncome = reportData?.totalIncome ?? 0;
+    final totalExpense = reportData?.totalExpense ?? 0;
+    final totalProfit = reportData?.totalProfit ?? 0;
 
     return Card(
       elevation: 0,
@@ -498,8 +535,7 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: AppColors.chartPalette[5]
-                        .withValues(alpha: 0.12),
+                    color: AppColors.chartPalette[5].withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
@@ -520,25 +556,25 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
           ),
           const SizedBox(height: 8),
           _LedgerRow(
-            label: 'Opening Balance',
+            label: 'Capital Invested',
             value: '₹${_formatAmount(partner.capital)}',
             color: AppColors.investment,
           ),
           _LedgerRow(
-            label: 'Total Credits',
-            value: '₹3.80L',
+            label: 'Total Income',
+            value: '₹${_formatAmount(totalIncome)}',
             color: AppColors.credit,
           ),
           _LedgerRow(
-            label: 'Total Debits',
-            value: '₹1.20L',
+            label: 'Total Expense',
+            value: '₹${_formatAmount(totalExpense)}',
             color: AppColors.debit,
           ),
           const Divider(indent: 16, endIndent: 16),
           _LedgerRow(
-            label: 'Closing Balance',
-            value: '₹4.20L',
-            color: colorScheme.primary,
+            label: 'Net Result',
+            value: '₹${_formatAmount(totalProfit)}',
+            color: totalProfit >= 0 ? AppColors.profit : AppColors.loss,
             isBold: true,
           ),
           const SizedBox(height: 12),
@@ -547,20 +583,12 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
     );
   }
 
-  Widget _buildPartnerComparison(BuildContext context) {
+  Widget _buildPartnerComparison(
+      BuildContext context, List<Partner> partners, ReportResponse? reportData) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    final comparisonData = [
-      _PartnerCompareData('Rajesh Kumar', 25.0, 380000, 27.0),
-      _PartnerCompareData('Priya Sharma', 20.0, 290000, 21.0),
-      _PartnerCompareData('Amit Patel', 15.0, 225000, 16.0),
-      _PartnerCompareData('Sneha Reddy', 12.0, 195000, 14.0),
-      _PartnerCompareData('Vikram Singh', 10.0, 150000, 11.0),
-    ];
-
-    final totalProfit =
-        comparisonData.fold<double>(0, (sum, p) => sum + p.profitShare);
+    final totalProfit = reportData?.totalProfit ?? 1;
 
     return Card(
       elevation: 0,
@@ -579,8 +607,7 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: AppColors.chartPalette[3]
-                        .withValues(alpha: 0.12),
+                    color: AppColors.chartPalette[3].withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
@@ -600,19 +627,22 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          ...comparisonData.map(
-            (p) => _PartnerComparisonRow(
-              name: p.name,
-              ownership: p.ownership,
-              profitShare: p.profitShare,
-              percentage: totalProfit > 0
-                  ? (p.profitShare / totalProfit) * 100
-                  : 0,
-              isSelected: p.name ==
-                  _partnerOptions
-                      .firstWhere((o) => o.id == _selectedPartnerId)
-                      .name,
-            ),
+          ...partners.map(
+            (p) {
+              final isSelected = p.id == _selectedPartnerId;
+              final profitShare = totalProfit > 0
+                  ? totalProfit * (p.ownershipPercentage / 100)
+                  : 0.0;
+              final percentage = totalProfit > 0 ? p.ownershipPercentage : 0.0;
+
+              return _PartnerComparisonRow(
+                name: p.name,
+                ownership: p.ownershipPercentage,
+                profitShare: profitShare,
+                percentage: percentage,
+                isSelected: isSelected,
+              );
+            },
           ),
           const SizedBox(height: 12),
         ],
@@ -625,6 +655,14 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
     if (value >= 100000) return '${(value / 100000).toStringAsFixed(2)}L';
     if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}K';
     return NumberFormat('#,##0.00').format(value);
+  }
+
+  String _monthAbbr(int month) {
+    const abbrs = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return abbrs[(month - 1).clamp(0, 11)];
   }
 
   void _handleExport(String type) {
@@ -640,25 +678,6 @@ class _PartnerReportScreenState extends ConsumerState<PartnerReportScreen> {
         ref.read(reportProvider.notifier).exportExcel(request: request);
     }
   }
-}
-
-class _PartnerOption {
-  final String id;
-  final String name;
-  final double capital;
-  final double ownership;
-
-  const _PartnerOption(this.id, this.name, this.capital, this.ownership);
-}
-
-class _PartnerCompareData {
-  final String name;
-  final double ownership;
-  final double profitShare;
-  final double contribution;
-
-  const _PartnerCompareData(
-      this.name, this.ownership, this.profitShare, this.contribution);
 }
 
 class _CompactDateButton extends StatelessWidget {
@@ -684,8 +703,7 @@ class _CompactDateButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -729,8 +747,7 @@ class _LedgerRow extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return Padding(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -795,8 +812,7 @@ class _PartnerComparisonRow extends StatelessWidget {
                 child: Text(
                   name,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight:
-                        isSelected ? FontWeight.w600 : FontWeight.w500,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                   ),
                 ),
               ),
@@ -813,7 +829,7 @@ class _PartnerComparisonRow extends StatelessWidget {
           Row(
             children: [
               Text(
-                '$ownership% ownership',
+                '${ownership.toStringAsFixed(1)}% ownership',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -825,8 +841,7 @@ class _PartnerComparisonRow extends StatelessWidget {
                   width: 80,
                   child: LinearProgressIndicator(
                     value: percentage / 100,
-                    backgroundColor:
-                        colorScheme.surfaceContainerHighest,
+                    backgroundColor: colorScheme.surfaceContainerHighest,
                     color: AppColors.profit,
                     minHeight: 4,
                   ),

@@ -41,12 +41,16 @@ class ReportRepository {
 
         double totalIncome = 0, totalExpense = 0;
         final monthlyMap = <String, MonthlyReport>{};
+        final categoryMap = <String, Map<String, double>>{};
+        final partnerMap = <String, Map<String, double>>{};
 
         for (final t in transactions) {
           final amount = _sheets.parseDouble(t['amount']);
           final type = _sheets.parseInt(t['type']);
           final date = DateTime.tryParse(t['date'] as String? ?? '') ?? DateTime.now();
           final key = '${date.year}-${date.month}';
+          final category = (t['category'] as String?) ?? 'Other';
+          final partnerId = (t['partnerId'] as String?) ?? 'unknown';
           final isIncome = type >= 3 && type <= 4;
 
           if (isIncome) {
@@ -74,12 +78,52 @@ class ReportRepository {
               transactionCount: 1,
             ),
           );
+
+          categoryMap.putIfAbsent(category, () => {'income': 0, 'expense': 0});
+          if (isIncome) {
+            categoryMap[category]!['income'] =
+                (categoryMap[category]!['income'] ?? 0) + amount;
+          } else {
+            categoryMap[category]!['expense'] =
+                (categoryMap[category]!['expense'] ?? 0) + amount;
+          }
+
+          partnerMap.putIfAbsent(partnerId, () => {'income': 0, 'expense': 0});
+          if (isIncome) {
+            partnerMap[partnerId]!['income'] =
+                (partnerMap[partnerId]!['income'] ?? 0) + amount;
+          } else {
+            partnerMap[partnerId]!['expense'] =
+                (partnerMap[partnerId]!['expense'] ?? 0) + amount;
+          }
         }
 
         for (final key in monthlyMap.keys) {
           final m = monthlyMap[key]!;
           monthlyMap[key] = m.copyWith(profit: m.income - m.expense);
         }
+
+        final categoryBreakdown = categoryMap.entries.map((e) {
+          return {
+            'category': e.key,
+            'income': e.value['income'] ?? 0,
+            'expense': e.value['expense'] ?? 0,
+            'total': (e.value['income'] ?? 0) + (e.value['expense'] ?? 0),
+          };
+        }).toList()
+          ..sort((a, b) => (b['total'] as double).compareTo(a['total'] as double));
+
+        final partnerBreakdown = partnerMap.entries.map((e) {
+          final income = e.value['income'] ?? 0;
+          final expense = e.value['expense'] ?? 0;
+          return {
+            'partnerId': e.key,
+            'income': income,
+            'expense': expense,
+            'profit': income - expense,
+          };
+        }).toList()
+          ..sort((a, b) => (b['profit'] as double).compareTo(a['profit'] as double));
 
         final report = ReportResponse(
           request: ReportRequest(startDate: startDate, endDate: endDate),
@@ -91,6 +135,8 @@ class ReportRepository {
           totalIncome: totalIncome,
           totalExpense: totalExpense,
           totalProfit: totalIncome - totalExpense,
+          partnerBreakdown: partnerBreakdown,
+          categoryBreakdown: categoryBreakdown,
           generatedAt: DateTime.now(),
         );
 

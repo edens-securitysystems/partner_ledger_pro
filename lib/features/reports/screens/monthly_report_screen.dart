@@ -4,10 +4,11 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../../core/constants/enums.dart';
+import '../../../core/database/enums/database_enums.dart';
 import '../../../core/models/dto/report_dto.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/common/app_bar_widget.dart';
+import '../../transactions/providers/transaction_provider.dart';
 import '../providers/report_provider.dart';
 import '../widgets/report_chart.dart';
 import '../widgets/report_summary.dart';
@@ -25,18 +26,8 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
   int _selectedMonth = DateTime.now().month;
 
   static const _monthNames = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
   ];
 
   @override
@@ -60,6 +51,7 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(reportProvider);
+    final reportData = state.reportData;
 
     return Scaffold(
       appBar: AppBarWidget(
@@ -107,13 +99,11 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
                 children: [
                   _buildMonthSelector(context),
                   const SizedBox(height: 16),
-                  ReportSummary(
-                    stats: _buildSummaryStats(),
-                  ),
+                  ReportSummary(stats: _buildSummaryStats(reportData)),
                   const SizedBox(height: 16),
-                  _buildIncomeBreakdown(context),
+                  _buildIncomeBreakdown(context, reportData),
                   const SizedBox(height: 16),
-                  _buildExpenseBreakdown(context),
+                  _buildExpenseBreakdown(context, reportData),
                   const SizedBox(height: 16),
                   _buildDailyProfitChart(context),
                   const SizedBox(height: 16),
@@ -194,8 +184,8 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
     );
   }
 
-  List<ReportStat> _buildSummaryStats() {
-    final monthly = _getMockMonthlyData();
+  List<ReportStat> _buildSummaryStats(ReportResponse? reportData) {
+    final monthly = _getMonthlyData(reportData);
     return [
       ReportStat(
         title: 'Total Income',
@@ -228,7 +218,58 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
     ];
   }
 
-  Widget _buildIncomeBreakdown(BuildContext context) {
+  MonthlyReport _getMonthlyData(ReportResponse? reportData) {
+    if (reportData == null) {
+      return MonthlyReport(
+        year: _selectedYear,
+        month: _selectedMonth,
+      );
+    }
+    for (final m in reportData.monthlyReports) {
+      if (m.year == _selectedYear && m.month == _selectedMonth) {
+        return m;
+      }
+    }
+    return MonthlyReport(
+      year: _selectedYear,
+      month: _selectedMonth,
+    );
+  }
+
+  Widget _buildIncomeBreakdown(BuildContext context, ReportResponse? reportData) {
+    final incomeCategories = reportData?.categoryBreakdown
+            .where((c) => (c['income'] as double) > 0)
+            .toList() ??
+        [];
+
+    if (incomeCategories.isEmpty) {
+      return ReportChartSection(
+        title: 'Income Breakdown',
+        subtitle: 'No income data for this month',
+        icon: Icons.trending_up_rounded,
+        iconColor: AppColors.profit,
+        height: 240,
+        child: const Center(
+          child: Text(
+            'No income transactions this month',
+            style: TextStyle(fontSize: 14),
+          ),
+        ),
+      );
+    }
+
+    final palette = AppColors.chartPalette;
+    final icons = [
+      Icons.shopping_cart_rounded,
+      Icons.build_rounded,
+      Icons.percent_rounded,
+      Icons.work_rounded,
+      Icons.more_horiz_rounded,
+      Icons.attach_money_rounded,
+      Icons.monetization_on_rounded,
+      Icons.savings_rounded,
+    ];
+
     return ReportChartSection(
       title: 'Income Breakdown',
       subtitle: 'Category-wise income distribution',
@@ -236,38 +277,55 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
       iconColor: AppColors.profit,
       height: 240,
       child: ReportPieChart(
-        sections: [
-          ReportPieData(
-            label: 'Sales',
-            value: 125000,
-            color: AppColors.chartPalette[1],
-            icon: Icons.shopping_cart_rounded,
-          ),
-          ReportPieData(
-            label: 'Services',
-            value: 85000,
-            color: AppColors.chartPalette[0],
-            icon: Icons.build_rounded,
-          ),
-          ReportPieData(
-            label: 'Commission',
-            value: 45000,
-            color: AppColors.chartPalette[5],
-            icon: Icons.percent_rounded,
-          ),
-          ReportPieData(
-            label: 'Other',
-            value: 25000,
-            color: AppColors.chartPalette[2],
-            icon: Icons.more_horiz_rounded,
-          ),
-        ],
+        sections: incomeCategories.asMap().entries.map((entry) {
+          final i = entry.key;
+          final c = entry.value;
+          return ReportPieData(
+            label: c['category'] as String,
+            value: c['income'] as double,
+            color: palette[i % palette.length],
+            icon: icons[i % icons.length],
+          );
+        }).toList(),
         centerLabel: 'Income',
       ),
     );
   }
 
-  Widget _buildExpenseBreakdown(BuildContext context) {
+  Widget _buildExpenseBreakdown(BuildContext context, ReportResponse? reportData) {
+    final expenseCategories = reportData?.categoryBreakdown
+            .where((c) => (c['expense'] as double) > 0)
+            .toList() ??
+        [];
+
+    if (expenseCategories.isEmpty) {
+      return ReportChartSection(
+        title: 'Expense Breakdown',
+        subtitle: 'No expense data for this month',
+        icon: Icons.trending_down_rounded,
+        iconColor: AppColors.debit,
+        height: 240,
+        child: const Center(
+          child: Text(
+            'No expense transactions this month',
+            style: TextStyle(fontSize: 14),
+          ),
+        ),
+      );
+    }
+
+    final palette = AppColors.chartPalette;
+    final icons = [
+      Icons.people_rounded,
+      Icons.home_rounded,
+      Icons.bolt_rounded,
+      Icons.inventory_2_rounded,
+      Icons.more_horiz_rounded,
+      Icons.build_rounded,
+      Icons.directions_car_rounded,
+      Icons.phone_rounded,
+    ];
+
     return ReportChartSection(
       title: 'Expense Breakdown',
       subtitle: 'Category-wise expense distribution',
@@ -275,38 +333,16 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
       iconColor: AppColors.debit,
       height: 240,
       child: ReportPieChart(
-        sections: [
-          ReportPieData(
-            label: 'Salaries',
-            value: 95000,
-            color: AppColors.chartPalette[3],
-            icon: Icons.people_rounded,
-          ),
-          ReportPieData(
-            label: 'Rent',
-            value: 35000,
-            color: AppColors.chartPalette[4],
-            icon: Icons.home_rounded,
-          ),
-          ReportPieData(
-            label: 'Utilities',
-            value: 18000,
-            color: AppColors.chartPalette[5],
-            icon: Icons.bolt_rounded,
-          ),
-          ReportPieData(
-            label: 'Supplies',
-            value: 22000,
-            color: AppColors.chartPalette[2],
-            icon: Icons.inventory_2_rounded,
-          ),
-          ReportPieData(
-            label: 'Other',
-            value: 15000,
-            color: AppColors.chartPalette[0],
-            icon: Icons.more_horiz_rounded,
-          ),
-        ],
+        sections: expenseCategories.asMap().entries.map((entry) {
+          final i = entry.key;
+          final c = entry.value;
+          return ReportPieData(
+            label: c['category'] as String,
+            value: c['expense'] as double,
+            color: palette[i % palette.length],
+            icon: icons[i % icons.length],
+          );
+        }).toList(),
         centerLabel: 'Expense',
       ),
     );
@@ -329,127 +365,135 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
   Widget _buildTransactionList(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final transactions = _getMockTransactions();
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.receipt_long_rounded,
-                    size: 18,
-                    color: colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Transactions',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+    return Consumer(
+      builder: (context, ref, _) {
+        final txState = ref.watch(transactionsProvider);
+        final allTransactions = txState.transactions;
+
+        final filteredTxns = allTransactions.where((t) {
+          return t.date.year == _selectedYear && t.date.month == _selectedMonth;
+        }).toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
+
+        return Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: colorScheme.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      Text(
-                        '${transactions.length} transactions this month',
+                      child: Icon(
+                        Icons.receipt_long_rounded,
+                        size: 18,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Transactions',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            '${filteredTxns.length} transactions this month',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 4),
+              if (filteredTxns.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Center(
+                    child: Text(
+                      'No transactions this month',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: filteredTxns.length,
+                  separatorBuilder: (_, __) => Divider(
+                    height: 1,
+                    indent: 56,
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                  ),
+                  itemBuilder: (context, index) {
+                    final txn = filteredTxns[index];
+                    final isIncome = txn.isIncome;
+                    final txnIcon = _txTypeIcon(txn.type);
+                    final txnColor = _txTypeColor(txn.type);
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 2),
+                      leading: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: txnColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(txnIcon, size: 18, color: txnColor),
+                      ),
+                      title: Text(
+                        txn.description ?? txn.category ?? 'Transaction',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        DateFormat('dd MMM yyyy').format(txn.date),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
-                    ],
-                  ),
+                      trailing: Text(
+                        '${isIncome ? '+' : '-'}₹${NumberFormat('#,##0.00').format(txn.amount.abs())}',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: isIncome ? AppColors.credit : AppColors.debit,
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              ],
-            ),
+            ],
           ),
-          const SizedBox(height: 4),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: transactions.length,
-            separatorBuilder: (_, __) => Divider(
-              height: 1,
-              indent: 56,
-              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-            ),
-            itemBuilder: (context, index) {
-              final txn = transactions[index];
-              return _TransactionTile(
-                title: txn['title'] as String,
-                amount: txn['amount'] as double,
-                date: txn['date'] as DateTime,
-                type: txn['type'] as TransactionType,
-              );
-            },
-          ),
-        ],
-      ),
+        );
+      },
     );
-  }
-
-  MonthlyReport _getMockMonthlyData() {
-    return MonthlyReport(
-      year: _selectedYear,
-      month: _selectedMonth,
-      income: 280000,
-      expense: 185000,
-      profit: 95000,
-      transactionCount: 47,
-    );
-  }
-
-  List<Map<String, dynamic>> _getMockTransactions() {
-    final now = DateTime(_selectedYear, _selectedMonth, 15);
-    return [
-      {
-        'title': 'Client Payment - Project Alpha',
-        'amount': 75000.0,
-        'date': now,
-        'type': TransactionType.income,
-      },
-      {
-        'title': 'Monthly Salaries',
-        'amount': -45000.0,
-        'date': now.subtract(const Duration(days: 2)),
-        'type': TransactionType.expense,
-      },
-      {
-        'title': 'Office Rent',
-        'amount': -35000.0,
-        'date': now.subtract(const Duration(days: 3)),
-        'type': TransactionType.expense,
-      },
-      {
-        'title': 'Partner Investment - Raj',
-        'amount': 50000.0,
-        'date': now.subtract(const Duration(days: 5)),
-        'type': TransactionType.investment,
-      },
-      {
-        'title': 'Service Revenue',
-        'amount': 32000.0,
-        'date': now.subtract(const Duration(days: 7)),
-        'type': TransactionType.income,
-      },
-    ];
   }
 
   String _formatAmount(double value) {
@@ -465,10 +509,62 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
     return NumberFormat('#,##0.00').format(value);
   }
 
+  IconData _txTypeIcon(TransactionType type) {
+    switch (type) {
+      case TransactionType.income:
+        return Icons.trending_up_rounded;
+      case TransactionType.expense:
+        return Icons.trending_down_rounded;
+      case TransactionType.investment:
+        return Icons.account_balance_rounded;
+      case TransactionType.withdrawal:
+        return Icons.payments_rounded;
+      case TransactionType.transfer:
+        return Icons.swap_horiz_rounded;
+      case TransactionType.loan:
+        return Icons.handshake_rounded;
+      case TransactionType.loanRepayment:
+        return Icons.receipt_rounded;
+      case TransactionType.adjustment:
+        return Icons.tune_rounded;
+      case TransactionType.profitDistribution:
+        return Icons.pie_chart_rounded;
+      case TransactionType.lossAllocation:
+        return Icons.remove_circle_outline_rounded;
+    }
+  }
+
+  Color _txTypeColor(TransactionType type) {
+    switch (type) {
+      case TransactionType.income:
+        return AppColors.profit;
+      case TransactionType.expense:
+        return AppColors.debit;
+      case TransactionType.investment:
+        return AppColors.chartPalette[0];
+      case TransactionType.withdrawal:
+        return AppColors.loss;
+      case TransactionType.transfer:
+        return AppColors.chartPalette[5];
+      case TransactionType.loan:
+        return AppColors.chartPalette[2];
+      case TransactionType.loanRepayment:
+        return AppColors.credit;
+      case TransactionType.adjustment:
+        return AppColors.chartPalette[3];
+      case TransactionType.profitDistribution:
+        return AppColors.profit;
+      case TransactionType.lossAllocation:
+        return AppColors.loss;
+    }
+  }
+
   void _shareReport() {
+    final reportData = ref.read(reportProvider).reportData;
+    final monthly = _getMonthlyData(reportData);
     Share.share(
       'Monthly Report - ${_monthNames[_selectedMonth - 1]} $_selectedYear\n'
-      'Income: ₹2,80,000 | Expense: ₹1,85,000 | Profit: ₹95,000',
+      'Income: ₹${_formatAmount(monthly.income)} | Expense: ₹${_formatAmount(monthly.expense)} | Profit: ₹${_formatAmount(monthly.profit)}',
       subject:
           'Monthly Report - ${_monthNames[_selectedMonth - 1]} $_selectedYear',
     );
@@ -542,8 +638,7 @@ class _DailyProfitLineChart extends StatelessWidget {
                   child: Text(
                     day.toString(),
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                   ),
                 );
@@ -559,8 +654,7 @@ class _DailyProfitLineChart extends StatelessWidget {
                 return Text(
                   _compact(value),
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color:
-                            Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                 );
               },
@@ -619,60 +713,5 @@ class _DailyProfitLineChart extends StatelessWidget {
 
   String _formatAmount(double value) {
     return NumberFormat('#,##0').format(value);
-  }
-}
-
-class _TransactionTile extends StatelessWidget {
-  final String title;
-  final double amount;
-  final DateTime date;
-  final TransactionType type;
-
-  const _TransactionTile({
-    required this.title,
-    required this.amount,
-    required this.date,
-    required this.type,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isCredit = amount >= 0;
-
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      leading: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: type.color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(type.icon, size: 18, color: type.color),
-      ),
-      title: Text(
-        title,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          fontWeight: FontWeight.w500,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        DateFormat('dd MMM yyyy').format(date),
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: colorScheme.onSurfaceVariant,
-        ),
-      ),
-      trailing: Text(
-        '${isCredit ? '+' : '-'}₹${NumberFormat('#,##0.00').format(amount.abs())}',
-        style: theme.textTheme.bodyMedium?.copyWith(
-          fontWeight: FontWeight.w600,
-          color: isCredit ? AppColors.credit : AppColors.debit,
-        ),
-      ),
-    );
   }
 }
